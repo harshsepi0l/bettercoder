@@ -74,6 +74,10 @@ Ideas get a hidden example: you see the values and a numbered story, never the c
 
 ### Beside your editor
 
+BetterCoder marks the line to write next in VS Code and shows the step's pseudocode faded beside it, one line at a time as you type. It is a decoration, so Tab never writes it into your file. When the step is typed out, the coach offers the next one.
+
+<p align="center"><img src="docs/images/editor.gif" alt="VS Code on the left, BetterCoder on the right: line 8 is marked with faded pseudocode, the learner types each line, the next pseudocode line appears, then BetterCoder shows Next step"></p>
+
 Make the window narrow and it fits next to your editor. Projects become blocks; tap one for its sessions.
 
 <p align="center"><img src="docs/images/narrow.png" width="320" alt="BetterCoder in a narrow window, a project's sessions open in a list"></p>
