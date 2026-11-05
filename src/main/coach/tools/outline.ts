@@ -15,9 +15,8 @@ function node(n: MapNode): string {
   const unfinished = (m: { stub?: boolean }) => (m.stub ? ' [unfinished]' : '')
   const methods = n.methods.map((m) => `${m.name}${m.detail}${unfinished(m)} @${m.line}`).join(', ')
   if (n.kind === 'module') return `  functions: ${methods || '(none)'}`
-  const label = n.kind === 'class' ? 'class' : n.kind
   const fields = n.fields.length ? ` fields: ${n.fields.map((f) => f.name).join(', ')};` : ''
-  return `  ${label} ${n.name} @${n.line}:${fields} ${methods ? `methods: ${methods}` : 'no methods'}`
+  return `  ${n.kind} ${n.name} @${n.line}:${fields} ${methods ? `methods: ${methods}` : 'no methods'}`
 }
 
 /** The outline as compact text for the model. */

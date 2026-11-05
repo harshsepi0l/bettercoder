@@ -114,8 +114,9 @@ function LineExample({ line, oneLine = false }: { line: StepLine; oneLine?: bool
   // For topics they're new to: the parts the coach named, found in the official line (the line itself is untouched).
   const segments = focus !== undefined && line.parts?.length ? splitLine(lines[focus], line.parts) : []
   const labelled = segments.some((s) => s.says)
-  // Until they tap, the first labelled part is shown, so the idea is visible at rest.
-  const current = picked ?? segments.findIndex((s) => s.says)
+  // Until they tap, the first labelled part is shown, so the idea is visible at rest. A pick from the other view
+  // (one line vs the whole example splits differently) falls back to the first labelled part.
+  const current = picked !== undefined && segments[picked]?.says ? picked : segments.findIndex((s) => s.says)
   return (
     <div className="flex flex-col gap-1.5">
       <div className={LABEL}>
@@ -131,7 +132,7 @@ function LineExample({ line, oneLine = false }: { line: StepLine; oneLine?: bool
       </pre>
       {labelled && <PartLabel segment={segments[current]} />}
       {oneLine && example.focus !== undefined && example.excerpt.length > 1 && (
-        <button type="button" onClick={() => setMore((m) => !m)} className="self-start text-[11.5px] text-brand-text underline-offset-2 hover:underline">
+        <button type="button" onClick={() => (setMore((m) => !m), setPicked(undefined))} className="self-start text-[11.5px] text-brand-text underline-offset-2 hover:underline">
           {more ? 'Just the line' : 'See it in the example'}
         </button>
       )}
@@ -165,16 +166,11 @@ function TapParts({ segments, current, onPick }: { segments: LineSegment[]; curr
   )
 }
 
-function PartLabel({ segment }: { segment?: LineSegment }) {
+/** The label of the part in view (one is always picked: the first labelled part until they tap). */
+function PartLabel({ segment }: { segment: LineSegment }) {
   return (
     <p className="min-h-[1.5em] text-[12.5px] leading-relaxed" aria-live="polite">
-      {segment?.says ? (
-        <>
-          <span className="font-mono text-heading">{segment.text.trim()}</span> {segment.says}
-        </>
-      ) : (
-        <span className="text-muted-foreground">Tap an underlined part to see what it does.</span>
-      )}
+      <span className="font-mono text-heading">{segment.text.trim()}</span> {segment.says}
     </p>
   )
 }

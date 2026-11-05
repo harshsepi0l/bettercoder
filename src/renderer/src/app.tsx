@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { lockedSections } from '../../shared/chat'
 import { AlertTriangle, X } from 'lucide-react'
 import { TitleBar } from '@/features/shell/title-bar'
@@ -57,10 +57,12 @@ export function App() {
   }, [sessionId])
   // A locked tab (Map in an idea; Visualize until it has an animation) falls back to Coach. Same rule as the tab row
   // (regression: this sent every idea back to Coach, so an unlocked Visualize tab still would not open).
-  const locked = lockedSections(isIdea, coach.items)
+  const locked = useMemo(() => lockedSections(isIdea, coach.items), [isIdea, coach.items])
+  const shownSection: SectionId = (locked as SectionId[]).includes(section) ? 'coach' : section
+  // Also reset what is stored, so a tab that unlocks later (an animation arrives) never jumps open by itself.
   useEffect(() => {
-    if ((locked as SectionId[]).includes(section)) setSection('coach')
-  }, [locked.join(), section])
+    if (shownSection !== section) setSection(shownSection)
+  }, [shownSection, section])
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -136,9 +138,9 @@ export function App() {
             ) : (
               <>
                 <SessionBar workspace={workspace} wide={wide} />
-                <PanelTabs section={section} onSectionChange={setSection} disabled={locked}>
+                <PanelTabs section={shownSection} onSectionChange={setSection} disabled={locked}>
                   <SectionContent
-                    section={section}
+                    section={shownSection}
                     project={project}
                     onOpenProject={() => workspace.open()}
                     coach={coach}
@@ -150,7 +152,7 @@ export function App() {
                     }}
                   />
                 </PanelTabs>
-                {section === 'coach' && (
+                {shownSection === 'coach' && (
                   <Composer
                     wide={wide}
                     disabledReason={disabledReason}

@@ -83,7 +83,7 @@ test('animate_example: only steps that change something on screen are kept (regr
 
 /** Regression (2026-11-04, serialize example): going back to steps 1-2 dropped `text` from the box, and step 1 lit nothing. */
 test('example player: values made later stay in the box (empty until made), and step 1 lights what it made', async () => {
-  const { changedNames, localsWithPending } = await import('../src/shared/example-steps')
+  const { changedNames, frameNames, localsWithPending } = await import('../src/shared/example-steps')
   const v = (n: number) => ({ t: 'num' as const, v: n })
   const step = (locals: Array<[string, ReturnType<typeof v>]>) => ({
     event: 'line' as const,
@@ -95,7 +95,7 @@ test('example player: values made later stay in the box (empty until made), and 
     scenarioStep: 0
   })
   const steps = [step([['person', v(1)]]), step([['person', v(1)]]), step([['person', v(1)], ['text', v(2)]])]
-  assert.deepEqual(localsWithPending(steps, 0, steps[0].frames[0]), [
+  assert.deepEqual(localsWithPending(frameNames(steps).get('0:top level'), steps[0].frames[0]), [
     ['person', v(1)],
     ['text', undefined]
   ])
@@ -116,4 +116,26 @@ test('player scrolling: only the animator box moves, by as little as needed', as
   assert.equal(revealInBox(b2, at(60, b2)), 40, 'already visible: no move')
   const b3 = box(0)
   assert.equal(revealInBox(b3, at(300, b3), 'center'), 260)
+})
+
+/**
+ * Regression (2026-11-04): the story line had its own "made or changed" rule that ignored which frame a name lived
+ * in, so a story line and the lit values could disagree when two frames shared a variable name.
+ */
+test('example story: says what was made or changed per frame, the same way the values are lit', async () => {
+  const { changedNames, storyLine } = await import('../src/shared/example-steps')
+  const num = (v: number) => ({ t: 'num' as const, v })
+  const step = (frames: Array<{ func: string; locals: Array<[string, ReturnType<typeof num>]> }>, output = '') => ({
+    event: 'line' as const, file: 'example', line: 1, func: frames.at(-1)!.func, frames, output, scenarioStep: 0
+  })
+  // `n` lives at top level; then a function call makes its own `n`.
+  const a = step([{ func: 'top level', locals: [['n', num(3)]] }])
+  const b = step([{ func: 'top level', locals: [['n', num(3)]] }, { func: 'factorial', locals: [['n', num(3)]] }], '')
+  const c = step([{ func: 'top level', locals: [['n', num(4)]] }], 'done\n')
+  const words = (prev: typeof a | undefined, cur: typeof a) =>
+    storyLine(prev, cur, false).map((p) => ('name' in p ? `${p.name} ${p.what}` : p.text))
+  assert.deepEqual(words(undefined, a), ['n is made'])
+  assert.deepEqual(words(a, b), ['n is made'], "the function's own n is new, even though top level has an n")
+  assert.deepEqual([...changedNames(a, b)], ['1:n'], 'and only that one is lit')
+  assert.deepEqual(words(b, c), ['n changes', 'prints done'])
 })

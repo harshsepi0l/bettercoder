@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Files, Folder, FolderOpen, FolderPlus, Home, Lightbulb, MessageSquare, Plus, Settings } from 'lucide-react'
+import { Files, FolderOpen, FolderPlus, Home, Lightbulb, MessageSquare, Plus, Settings } from 'lucide-react'
 import { STYLES, type LearnerProfile } from '../../../../shared/profile'
 import type { ProjectSummary } from '../../../../shared/workspace'
 import { Button } from '@/components/ui/button'
@@ -38,7 +38,8 @@ export interface SidebarProps {
   onOpenProfile: () => void
 }
 
-function ProjectIcon({ kind, className }: { kind: ProjectSummary['kind']; className?: string }) {
+/** A project's icon: folder, files or idea (also the title bar's). */
+export function ProjectIcon({ kind, className }: { kind: ProjectSummary['kind']; className?: string }) {
   const Icon = kind === 'idea' ? Lightbulb : kind === 'files' ? Files : FolderOpen
   return <Icon className={cn('size-3.5 shrink-0 text-brand-text', className)} aria-hidden="true" />
 }
@@ -147,10 +148,10 @@ function ProjectFlyout({
               size="icon"
               aria-label={`${project.name} project, ${count(project.sessions.length)}`}
               aria-current={active ? 'page' : undefined}
-              className={cn('relative size-11 flex-col gap-0.5', active && 'bg-accent text-heading ring-1 ring-brand-line/60')}
+              className={cn('relative size-11 flex-col gap-0.5', active && RAIL_ACTIVE)}
             >
               {/* A project is a folder; the badge counts its sessions (conversations). */}
-              <Folder className="size-4" aria-hidden="true" />
+              <ProjectIcon kind={project.kind} className="size-4 text-current" />
               <span className="font-mono text-[10px] leading-none lowercase">{project.name.slice(0, 2)}</span>
               <span
                 className={cn(
@@ -169,7 +170,7 @@ function ProjectFlyout({
       {/* Don't hand focus back to the block on close: it stayed outlined (and showed its tooltip) as if still pressed. */}
       <DropdownMenuContent side="right" align="start" sideOffset={6} className="w-72" onCloseAutoFocus={(e) => e.preventDefault()}>
         <DropdownMenuLabel className="flex items-center gap-2 border-b pb-2">
-          <Folder className="size-4.5 shrink-0 text-brand-text" aria-hidden="true" />
+          <ProjectIcon kind={project.kind} className="size-4.5" />
           <span className="flex min-w-0 flex-col">
             <span className="font-mono text-[9.5px] font-normal tracking-[0.08em] text-muted-foreground">PROJECT</span>
             <span className="truncate text-[13.5px] text-heading">{project.name}</span>
@@ -210,6 +211,9 @@ function ProjectFlyout({
   )
 }
 
+/** The look of the open project or page in the narrow rail. */
+const RAIL_ACTIVE = 'bg-accent text-heading ring-1 ring-brand-line/60'
+
 /** Sessions shown in a project's flyout before "Show N more". */
 const FIRST = 4
 const count = (n: number) => `${n} ${n === 1 ? 'session' : 'sessions'}`
@@ -224,7 +228,7 @@ function RailButton({ label, active, onClick, children }: { label: string; activ
           aria-label={label}
           aria-current={active ? 'page' : undefined}
           onClick={onClick}
-          className={cn('size-10', active && 'bg-accent text-heading ring-1 ring-brand-line/60')}
+          className={cn('size-10', active && RAIL_ACTIVE)}
         >
           {children}
         </Button>

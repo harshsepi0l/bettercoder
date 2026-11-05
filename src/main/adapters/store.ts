@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { ProjectSummary, SessionSummary } from '../../shared/workspace'
+import { projectKind, type ProjectSummary, type SessionSummary } from '../../shared/workspace'
 import type { ProjectRecord, SessionRecord, SessionStore } from '../ports'
 
 /**
@@ -15,12 +15,27 @@ import type { ProjectRecord, SessionRecord, SessionStore } from '../ports'
  * The Map is read from the code on demand; nothing project-level is stored yet.
  */
 
-export type { ProjectRecord, SessionRecord }
-
 async function writeJson(file: string, value: unknown): Promise<void> {
   const tmp = `${file}.${process.pid}.${randomUUID().slice(0, 8)}.tmp`
   await writeFile(tmp, JSON.stringify(value), { mode: 0o600 })
   await rename(tmp, file)
+}
+
+/** At most this many files are read at once when listing. */
+const READ_LIMIT = 16
+
+/** Like Promise.all over `items`, with at most `limit` running at once; results keep their order. */
+async function mapLimit<T, R>(items: readonly T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return out
 }
 
 async function readJson<T>(file: string): Promise<T | null> {
@@ -53,9 +68,7 @@ export class WorkspaceStore implements SessionStore {
     const file = join(this.projectDir(id), 'project.json')
     const now = Date.now()
     const existing = await readJson<ProjectRecord>(file)
-    const record: ProjectRecord = existing
-      ? { ...existing, name, lastOpenedAt: now }
-      : { id, root, name, ...(files ? { files } : {}), createdAt: now, lastOpenedAt: now }
+    const record: ProjectRecord = existing ? { ...existing, name } : { id, root, name, ...(files ? { files } : {}), createdAt: now }
     await writeJson(file, record)
     return record
   }
@@ -64,8 +77,7 @@ export class WorkspaceStore implements SessionStore {
   async createIdeaProject(name: string, idea: string): Promise<ProjectRecord> {
     const id = projectIdFor(`idea:${randomUUID()}`)
     await mkdir(this.sessionsDir(id), { recursive: true })
-    const now = Date.now()
-    const record: ProjectRecord = { id, root: '', name, idea, createdAt: now, lastOpenedAt: now }
+    const record: ProjectRecord = { id, root: '', name, idea, createdAt: Date.now() }
     await writeJson(join(this.projectDir(id), 'project.json'), record)
     return record
   }
@@ -74,7 +86,7 @@ export class WorkspaceStore implements SessionStore {
   async linkFolder(id: string, root: string): Promise<ProjectRecord> {
     const p = await this.getProject(id)
     if (!p) throw new Error('That project is no longer known.')
-    const record: ProjectRecord = { ...p, root, lastOpenedAt: Date.now() }
+    const record: ProjectRecord = { ...p, root }
     delete record.files
     await writeJson(join(this.projectDir(id), 'project.json'), record)
     return record
@@ -82,11 +94,6 @@ export class WorkspaceStore implements SessionStore {
 
   async getProject(id: string): Promise<ProjectRecord | null> {
     return readJson<ProjectRecord>(join(this.projectDir(id), 'project.json'))
-  }
-
-  async touchProject(id: string): Promise<void> {
-    const p = await this.getProject(id)
-    if (p) await writeJson(join(this.projectDir(id), 'project.json'), { ...p, lastOpenedAt: Date.now() })
   }
 
   async createSession(projectId: string): Promise<SessionRecord> {
@@ -137,9 +144,7 @@ export class WorkspaceStore implements SessionStore {
 
   private async projectIds(): Promise<string[]> {
     try {
-      return (await readdir(join(this.dataDir, 'projects'), { withFileTypes: true }))
-        .filter((d) => d.isDirectory())
-        .map((d) => d.name)
+      return (await readdir(join(this.dataDir, 'projects'), { withFileTypes: true })).filter((d) => d.isDirectory()).map((d) => d.name)
     } catch {
       return []
     }
@@ -151,34 +156,22 @@ export class WorkspaceStore implements SessionStore {
    * sent its project to the top).
    */
   async list(): Promise<ProjectSummary[]> {
-    const out: ProjectSummary[] = []
-    const created = new Map<string, number>()
-    for (const id of await this.projectIds()) {
+    // Read in parallel, a few files at a time (this runs after every message; too many open files at once would
+    // fail and silently drop sessions from the list).
+    const listed = await mapLimit(await this.projectIds(), READ_LIMIT, async (id) => {
       const p = await this.getProject(id)
-      if (!p) continue
-      created.set(p.id, p.createdAt)
-      const sessions: SessionSummary[] = []
-      let files: string[] = []
-      try {
-        files = (await readdir(this.sessionsDir(id))).filter((f) => f.endsWith('.json'))
-      } catch {
-        files = []
-      }
-      for (const f of files) {
-        const s = await readJson<SessionRecord>(join(this.sessionsDir(id), f))
-        if (s) sessions.push({ id: s.id, projectId: s.projectId, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt })
-      }
-      sessions.sort((a, b) => b.updatedAt - a.updatedAt)
-      out.push({
-        id: p.id,
-        name: p.name,
-        root: p.root,
-        kind: !p.root ? 'idea' : p.files ? 'files' : 'folder',
-        lastOpenedAt: p.lastOpenedAt,
-        sessions
-      })
-    }
-    const activity = (p: ProjectSummary) => Math.max(p.sessions[0]?.updatedAt ?? 0, created.get(p.id) ?? 0)
-    return out.sort((a, b) => activity(b) - activity(a))
+      if (!p) return null
+      const files = (await readdir(this.sessionsDir(id)).catch(() => [] as string[])).filter((f) => f.endsWith('.json'))
+      const sessions: SessionSummary[] = (await mapLimit(files, READ_LIMIT, (f) => readJson<SessionRecord>(join(this.sessionsDir(id), f))))
+        .filter((s): s is SessionRecord => !!s)
+        .map((s) => ({ id: s.id, projectId: s.projectId, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt }))
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+      const summary: ProjectSummary = { id: p.id, name: p.name, root: p.root, kind: projectKind(p), sessions }
+      return { summary, activity: Math.max(sessions[0]?.updatedAt ?? 0, p.createdAt) }
+    })
+    return listed
+      .filter((x) => x !== null)
+      .sort((a, b) => b.activity - a.activity)
+      .map((x) => x.summary)
   }
 }

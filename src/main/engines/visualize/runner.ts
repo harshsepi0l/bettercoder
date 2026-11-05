@@ -4,7 +4,6 @@ import { tmpdir } from 'node:os'
 import { dirname, extname, join, relative } from 'node:path'
 import type { Trace, TraceStep, TraceValue } from '../../../shared/trace'
 import type { Animator, RunRequest } from '../../ports'
-export { plainValue, summarizeTrace } from '../../core/trace-summary'
 import { SKIP_DIRS } from '../../core/paths'
 import { resolveInside } from '../../adapters/fs-readonly'
 import { isSecretPath } from '../../core/paths'
@@ -120,8 +119,6 @@ async function copyPythonFiles(root: string, dest: string, only?: string[]): Pro
   }
   await walk(root, 0)
 }
-
-export type { RunRequest }
 
 /** Run a scenario against the learner's file and record every step. */
 export async function runTrace(req: RunRequest): Promise<Trace> {
