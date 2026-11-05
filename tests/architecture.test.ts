@@ -26,10 +26,10 @@ function layerOf(file: string): number {
   return i
 }
 
-function walk(dir: string): string[] {
+function walk(dir: string, ext = /\.ts$/): string[] {
   return readdirSync(dir).flatMap((n) => {
     const p = join(dir, n)
-    return statSync(p).isDirectory() ? walk(p) : p.endsWith('.ts') ? [p] : []
+    return statSync(p).isDirectory() ? walk(p, ext) : ext.test(p) ? [p] : []
   })
 }
 
@@ -73,12 +73,8 @@ test('architecture: core is pure (no Electron, no pi, no file access)', () => {
  */
 test('renderer: effects never return a value by accident', () => {
   const RENDERER = join(import.meta.dirname, '..', 'src', 'renderer', 'src')
-  const tsx = (dir: string): string[] =>
-    readdirSync(dir).flatMap((n) => {
-      const p = join(dir, n)
-      return statSync(p).isDirectory() ? tsx(p) : /\.tsx?$/.test(p) ? [p] : []
-    })
-  const wrong = tsx(RENDERER).filter((f) => /useEffect\(\(\) => [^{\s]/.test(readFileSync(f, 'utf8')))
+  // Also an expression body on the next line, and layout effects.
+  const wrong = walk(RENDERER, /\.tsx?$/).filter((f) => /use(Layout)?Effect\(\(\) =>\s*[^{\s]/.test(readFileSync(f, 'utf8')))
   assert.deepEqual(wrong.map((f) => relative(RENDERER, f)), [])
 })
 

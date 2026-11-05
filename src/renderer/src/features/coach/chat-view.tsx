@@ -1,4 +1,4 @@
-import { Component, useEffect, useRef, type ReactNode } from 'react'
+import { Component, useEffect, useMemo, useRef, type ReactNode } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { AlertTriangle, Check, FileText, Loader2, X } from 'lucide-react'
@@ -12,10 +12,17 @@ export function ChatView({ items, busy, onAnswer }: { items: ChatItem[]; busy: b
     end.current?.scrollIntoView({ block: 'end' })
   }, [items, busy])
 
-  const answers = questionStates(items)
-  const latestPseudo = items.findLast((x) => x.kind === 'card' && x.card.kind === 'pseudocode')?.id
-  // An answer given by clicking a card shows on the card, so its chat bubble is hidden.
-  const hidden = new Set([...answers.values()].map((a) => a.answerIndex).filter((i): i is number => i !== undefined))
+  // Worked out once per change to the chat, not on every render (a streamed reply re-renders per token).
+  const { answers, latestPseudo, hidden, turns } = useMemo(() => {
+    const answers = questionStates(items)
+    return {
+      answers,
+      latestPseudo: items.findLast((x) => x.kind === 'card' && x.card.kind === 'pseudocode')?.id,
+      // An answer given by clicking a card shows on the card, so its chat bubble is hidden.
+      hidden: new Set([...answers.values()].map((a) => a.answerIndex).filter((i): i is number => i !== undefined)),
+      turns: coachTurns(items)
+    }
+  }, [items])
 
   const renderItem = (item: ChatItem, i: number) => {
     if (hidden.has(i)) return null
@@ -32,7 +39,7 @@ export function ChatView({ items, busy, onAnswer }: { items: ChatItem[]; busy: b
 
   return (
     <div className="flex flex-col gap-3.5" aria-live="polite">
-      {coachTurns(items).map((turn) =>
+      {turns.map((turn) =>
         turn.user ? (
           renderItem(items[turn.from], turn.from)
         ) : (

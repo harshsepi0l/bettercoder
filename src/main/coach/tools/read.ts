@@ -38,7 +38,6 @@ function isBinary(buf: Uint8Array): boolean {
  */
 export function createTools(fs: ProjectFiles, root: string, files?: string[]): AgentTool<any>[] {
   const allowed = files ? new Set(files) : undefined
-  const resolveInside = fs.resolve
 
   const ListParams = Type.Object({
     path: Type.Optional(Type.String({ description: "Folder relative to the project root. Default '.'" })),
@@ -52,7 +51,7 @@ export function createTools(fs: ProjectFiles, root: string, files?: string[]): A
     parameters: ListParams,
     execute: async (_id, params) => {
       if (files) return text(`This session was opened on these files only:\n${files.join('\n')}`)
-      const { abs, rel } = await resolveInside(root, params.path ?? '.')
+      const { abs, rel } = await fs.resolve(root, params.path ?? '.')
       const depthLimit = params.depth ?? 2
       const lines: string[] = []
       async function walk(dir: string, prefix: string, depth: number): Promise<void> {
@@ -88,7 +87,7 @@ export function createTools(fs: ProjectFiles, root: string, files?: string[]): A
       'Read a text file in the project (read-only), with line numbers. Jupyter notebooks are shown as cells (markdown, code, short outputs). Use start_line/end_line for large files. Files that hold secrets are refused.',
     parameters: ReadParams,
     execute: async (_id, params) => {
-      const { abs, rel } = await resolveInside(root, params.path, allowed)
+      const { abs, rel } = await fs.resolve(root, params.path, allowed)
       const info = await fs.info(abs)
       if (!info.isFile) throw new Error(`${rel} is not a file`)
       const buf = await fs.read(abs)
@@ -130,7 +129,7 @@ export function createTools(fs: ProjectFiles, root: string, files?: string[]): A
           if (hits.length >= MAX_SEARCH_HITS) break
           let abs: string
           try {
-            abs = (await resolveInside(root, f, allowed)).abs
+            abs = (await fs.resolve(root, f, allowed)).abs
           } catch {
             continue
           }
@@ -143,8 +142,8 @@ export function createTools(fs: ProjectFiles, root: string, files?: string[]): A
         }
         return text(hits.length ? hits.join('\n') : `No matches for "${params.query}".`)
       }
-      const { abs } = await resolveInside(root, params.path ?? '.')
-      const rootReal = (await resolveInside(root, '.')).abs
+      const { abs } = await fs.resolve(root, params.path ?? '.')
+      const rootReal = (await fs.resolve(root, '.')).abs
       async function walk(dir: string, depth: number): Promise<void> {
         if (hits.length >= MAX_SEARCH_HITS || depth > 6 || signal?.aborted) return
         const entries = await fs.list(dir)

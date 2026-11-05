@@ -71,7 +71,6 @@ export interface ProjectRecord {
   /** Set for projects started from an idea. root stays '' until the learner links a folder. */
   idea?: string
   createdAt: number
-  lastOpenedAt: number
 }
 
 export interface SessionRecord extends SessionSummary {
@@ -84,7 +83,6 @@ export interface SessionStore {
   createIdeaProject(name: string, idea: string): Promise<ProjectRecord>
   linkFolder(id: string, root: string): Promise<ProjectRecord>
   getProject(id: string): Promise<ProjectRecord | null>
-  touchProject(id: string): Promise<void>
   createSession(projectId: string): Promise<SessionRecord>
   saveSession(record: SessionRecord): Promise<void>
   getSession(sessionId: string): Promise<SessionRecord | null>

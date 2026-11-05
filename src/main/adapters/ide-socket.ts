@@ -16,7 +16,6 @@ const MAX_LINE = 600_000
 const MAX_TEXT = 400_000
 const MAX_DIAGNOSTICS = 20
 
-export type { EditorSnapshot }
 
 /** Parse one line from the editor. Anything malformed is ignored, never thrown. */
 export function parseIdeMessage(line: string): FromIde | null {

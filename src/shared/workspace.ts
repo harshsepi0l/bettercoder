@@ -29,13 +29,17 @@ export interface SessionSummary {
   updatedAt: number
 }
 
+/** What kind of project it is, from its folder and files: the one rule the sidebar and the title bar share. */
+export function projectKind(p: { root: string; files?: readonly string[] }): ProjectSummary['kind'] {
+  return !p.root ? 'idea' : p.files ? 'files' : 'folder'
+}
+
 export interface ProjectSummary {
   id: string
   name: string
   root: string
   /** A whole folder, individually opened files, or an idea with no folder yet. */
   kind: 'folder' | 'files' | 'idea'
-  lastOpenedAt: number
   sessions: SessionSummary[]
 }
 

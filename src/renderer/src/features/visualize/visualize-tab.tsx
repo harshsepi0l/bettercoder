@@ -45,16 +45,14 @@ function parseArgs(text: string): unknown[] {
  * Every animation the coach showed in this session (pick one to replay it full size), then: pick a Python file,
  * describe calls to run, and watch your code execute step by step.
  */
-export function VisualizeTab({ project, items = [] }: { project: ProjectInfo | null; items?: ChatItem[] }) {
+export function VisualizeTab({ project, items }: { project: ProjectInfo | null; items: ChatItem[] }) {
   const shown = useMemo(() => animationsFromChat(items), [items])
-  const session = shown.length > 0 && <SessionAnimations animations={shown} />
-  // With no folder, the session's animations are the whole tab (the "open a folder" note only shows when there are none).
-  const ownCode = project?.root || !session ? <OwnCode project={project} /> : null
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 p-3.5">
-        {session}
-        {ownCode}
+        {shown.length > 0 && <SessionAnimations animations={shown} />}
+        {/* With no folder, the session's animations are the whole tab ("open a folder" shows only when there are none). */}
+        {(project?.root || shown.length === 0) && <OwnCode project={project} />}
       </div>
     </ScrollArea>
   )
@@ -230,7 +228,6 @@ function OwnCode({ project }: { project: ProjectInfo | null }) {
                 variant="ghost"
                 size="icon-sm"
                 aria-label={`Remove call ${i + 1}`}
-                disabled={rows.length === 0}
                 onClick={() => setRows((rs) => rs.filter((_, k) => k !== i))}
               >
                 <X />

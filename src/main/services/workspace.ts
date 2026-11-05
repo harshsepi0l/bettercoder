@@ -1,6 +1,5 @@
 import { join } from 'node:path'
-import type { Models } from '@earendil-works/pi-ai'
-import type { Api, Model } from '@earendil-works/pi-ai'
+import type { Api, Model, Models } from '@earendil-works/pi-ai'
 import { titleFrom } from '../../shared/chat'
 import type { CardUse, CoachIntent, HarnessEvent } from '../../shared/harness'
 import type { OpenSession, ProjectSummary } from '../../shared/workspace'
@@ -188,15 +187,6 @@ export class WorkspaceController {
     void this.active?.coach.abort()
   }
 
-  /**
-   * Save the open session's record (the conversation is already committed by pi-durable). The timestamp is left
-   * alone: it moves only when the learner sends something (regression: leaving a session sent it to the top).
-   */
-  async flush(): Promise<void> {
-    if (!this.active) return
-    await this.store.saveSession(this.active.record)
-  }
-
   /** Close the app cleanly: pending work resumes next time the session opens. */
   shutdown(): Promise<void> {
     return this.serial(() => this.closeActive(false))
@@ -205,8 +195,9 @@ export class WorkspaceController {
   private async closeActive(deleting: boolean): Promise<void> {
     if (!this.active) return
     const { coach } = this.active
-    if (!deleting) await this.flush()
-    else await coach.abort().catch(() => undefined)
+    // The record is saved wherever it changes (send, rename); the timestamp moves only on send, so leaving a
+    // session never reorders the sidebar.
+    if (deleting) await coach.abort().catch(() => undefined)
     this.active = null
     this.deps.ide?.setSession(null)
     await coach.close().catch(() => undefined)
@@ -228,7 +219,6 @@ export class WorkspaceController {
           ? await this.deps.ports.scanner.scanFiles(project.files.map((f) => join(project.root, f)))
           : await this.deps.ports.scanner.scanFolder(project.root)
       const info: ProjectInfo = project.idea ? { ...detected, idea: project.idea } : detected
-      await this.store.touchProject(project.id)
       const coach = await Coach.open(
         this.store.sessionDbFile(record),
         info,
@@ -279,6 +269,7 @@ export class WorkspaceController {
     const active = this.active
     if (!active || active.record.id !== sessionId) return
     this.deps.emit(e)
-    if (e.type === 'busy' && !e.busy) void this.flush().then(() => this.deps.changed())
+    // A finished turn may have changed what the sidebar shows (a resumed run, a linked folder): refresh it.
+    if (e.type === 'busy' && !e.busy) this.deps.changed()
   }
 }

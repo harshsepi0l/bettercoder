@@ -5,7 +5,7 @@ import type { ChatItem } from '../../shared/chat'
 import type { TurnUsage } from '../../shared/harness'
 import { TOOL_TEXT_REQUEST } from './prompts'
 import { VISUAL_TOOL_NAMES } from './tools/cards'
-import { HIDDEN_PREFIX, READ_TOOLS, stripIntent, textOf, withoutToolNames, hasCode } from './turn'
+import { ANIMATE_TOOLS, HIDDEN_PREFIX, READ_TOOLS, stripIntent, textOf, withoutToolNames, hasCode } from './turn'
 
 /**
  * Rebuilding what the learner saw from the stored transcript: the chat items, usage, and the last marked step.
@@ -32,7 +32,7 @@ export function describeTool(name: string, args: Record<string, unknown> | undef
 
 /** Shows as a tool line in the chat (cards appear as cards instead). */
 export function isToolLine(name: string): boolean {
-  return READ_TOOLS.has(name) || name === 'animate_code' || name === 'animate_example'
+  return READ_TOOLS.has(name) || ANIMATE_TOOLS.has(name)
 }
 
 /** The chat as the learner saw it, rebuilt from the stored transcript. */

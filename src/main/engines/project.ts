@@ -45,8 +45,6 @@ export const EXTENSIONS: Record<string, string> = {
   '.sql': 'SQL', '.sh': 'Shell', '.zsh': 'Shell', '.ps1': 'PowerShell'
 }
 
-/** Folders that hold dependencies or build output, not the user's own code. */
-export { SKIP_DIRS }
 const MAX_DEPTH = 4
 const MAX_FILES = 5000
 

@@ -67,7 +67,7 @@ async function listCodeFiles(project: ProjectInfo): Promise<{ files: string[]; t
       if (e.name.startsWith('.')) continue
       const full = join(dir, e.name)
       if (e.isDirectory()) {
-        if (!SKIP_DIRS.has(e.name) && e.name !== '__pycache__') await walk(full, depth + 1)
+        if (!SKIP_DIRS.has(e.name)) await walk(full, depth + 1)
       } else if (e.isFile()) {
         const rel = relative(project.root, full)
         if (wanted(rel)) out.push(rel)

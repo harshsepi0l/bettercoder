@@ -1,31 +1,12 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import { AlertTriangle, ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
 import type { Trace, TraceStep } from '../../../../shared/trace'
-import { changedNames, localsWithPending, visibleSteps } from '../../../../shared/example-steps'
+import { changedNames, frameNames, localsWithPending, storyLine, visibleSteps, type StoryPart } from '../../../../shared/example-steps'
 import { Button } from '@/components/ui/button'
 import { useCodeView } from '@/features/coach/code-view'
 import { revealInBox } from '@/lib/scroll'
 import { cn } from '@/lib/utils'
 import { ValueView } from './values'
-
-type StoryPart = { name: string; what: string } | { text: string }
-
-/** For a hidden example: what changed on screen, since there are no lines to point at. Names are kept apart to light them. */
-function narrateExample(prev: TraceStep | undefined, step: TraceStep, isLast: boolean): StoryPart[] {
-  if (step.event === 'exception') return [{ text: `Error: ${step.exception ?? ''}` }]
-  const before = new Map(prev?.frames.flatMap((f) => f.locals.map(([n, v]) => [n, JSON.stringify(v)] as const)) ?? [])
-  const parts: StoryPart[] = []
-  for (const f of step.frames) {
-    for (const [n, v] of f.locals) {
-      if (!before.has(n)) parts.push({ name: n, what: 'is made' })
-      else if (before.get(n) !== JSON.stringify(v)) parts.push({ name: n, what: 'changes' })
-    }
-  }
-  const printed = step.output.slice(prev?.output.length ?? 0).trim()
-  if (printed) parts.push({ text: `prints ${printed.split('\n').at(-1)}` })
-  if (parts.length) return parts
-  return [{ text: isLast ? 'Done' : 'Start' }]
-}
 
 function narrate(step: TraceStep, file: string): string {
   const where = step.file === file ? `line ${step.line}` : `${step.file}:${step.line}`
@@ -48,7 +29,21 @@ const LIT = 'bg-brand-tint ring-1 ring-brand-line/60'
  * A hidden example's story: one numbered line per step reached, growing as it plays. Lines stay once shown (going
  * back only moves the light); the current line and the values it names are lit the same way.
  */
-function Story({ steps, at, shown, onPick, one }: { steps: TraceStep[]; at: number; shown: number; onPick: (i: number) => void; one: boolean }) {
+function Story({
+  steps,
+  story,
+  at,
+  shown,
+  onPick,
+  one
+}: {
+  steps: TraceStep[]
+  story: StoryPart[][]
+  at: number
+  shown: number
+  onPick: (i: number) => void
+  one: boolean
+}) {
   const box = useRef<HTMLOListElement>(null)
   const end = useRef<HTMLLIElement>(null)
   useEffect(() => {
@@ -58,8 +53,9 @@ function Story({ steps, at, shown, onPick, one }: { steps: TraceStep[]; at: numb
   return (
     <ol ref={box} className="m-0 flex max-h-80 list-none flex-col gap-0.5 overflow-auto rounded-md bg-muted p-1.5 text-[12.5px]">
       {/* One at a time (the step-card setting): only the current line. Highlight: every line reached, current lit. */}
-      {steps.slice(0, Math.max(shown, at) + 1).map((s, k) =>
-        one && k !== at ? null : (
+      {(one ? [at] : steps.slice(0, shown + 1).map((_, k) => k)).map((k) => {
+        const s = steps[k]
+        return (
           <li key={k} ref={k === at ? end : undefined}>
             <button
               type="button"
@@ -72,7 +68,7 @@ function Story({ steps, at, shown, onPick, one }: { steps: TraceStep[]; at: numb
             >
               <span className="w-4 shrink-0 text-right font-mono text-[10.5px] leading-[1.6]">{k + 1}.</span>
               <span className="min-w-0 flex-1 break-words">
-                {narrateExample(steps[k - 1], s, k === steps.length - 1).map((p, n) => (
+                {story[k].map((p, n) => (
                   <span key={n}>
                     {n > 0 && <span className="text-muted-foreground"> · </span>}
                     {'name' in p ? (
@@ -89,17 +85,23 @@ function Story({ steps, at, shown, onPick, one }: { steps: TraceStep[]; at: numb
             </button>
           </li>
         )
-      )}
+      })}
     </ol>
   )
 }
 
 const SPEEDS = [1400, 800, 400]
 
-/** Step through a recorded run: code on one side, variables drawn on the other. */
-export function TracePlayer({ trace, compact = false }: { trace: Trace; compact?: boolean }) {
+/**
+ * Step through a recorded run: code on one side, variables drawn on the other. Memoised: a card's trace never
+ * changes, so a streamed reply re-rendering the chat must not redraw every player in it.
+ */
+export const TracePlayer = memo(function TracePlayer({ trace, compact = false }: { trace: Trace; compact?: boolean }) {
   // A hidden example shows only steps where something on screen changes (also for ones saved before that rule).
   const steps = useMemo(() => (trace.example ? visibleSteps(trace.steps) : trace.steps), [trace])
+  // Worked out once per trace: each step's story line, and every name each frame will make.
+  const story = useMemo(() => (trace.example ? steps.map((s, k) => storyLine(steps[k - 1], s, k === steps.length - 1)) : []), [steps, trace.example])
+  const names = useMemo(() => (trace.example ? frameNames(steps) : null), [steps, trace.example])
   const total = steps.length
   const [i, setI] = useState(0)
   // The learner's step-card choice (Settings › You) also sets how an example's story shows; Highlight until they pick.
@@ -134,7 +136,7 @@ export function TracePlayer({ trace, compact = false }: { trace: Trace; compact?
     else if (e.key === ' ') {
       e.preventDefault()
       setPlaying((p) => !p)
-    } else return
+    }
   }
 
   if (total === 0) {
@@ -186,40 +188,46 @@ export function TracePlayer({ trace, compact = false }: { trace: Trace; compact?
 
         {/* An example has no code pane, so its values get the room (they were cut off at 16rem). */}
         <div className={cn('flex flex-col gap-2 overflow-auto', trace.example ? 'max-h-[32rem]' : compact ? 'max-h-64' : 'max-h-[420px]')}>
-          {step.frames.map((f, fi) => (
-            <div key={`${fi}-${f.func}`} className={cn('rounded-md border px-2.5 py-2', fi === step.frames.length - 1 && fi > 0 ? 'border-brand-line/60' : '')}>
-              <div className="mb-1.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
-                {f.func === 'scenario' ? 'YOUR SCENARIO' : f.func === 'top level' ? (trace.example ? 'VALUES' : 'TOP LEVEL') : `${f.func.toUpperCase()}()`}
+          {step.frames.map((f, fi) => {
+            const locals = names ? localsWithPending(names.get(`${fi}:${f.func}`), f) : f.locals
+            return (
+              <div
+                key={`${fi}-${f.func}`}
+                className={cn('rounded-md border px-2.5 py-2', fi === step.frames.length - 1 && fi > 0 ? 'border-brand-line/60' : '')}
+              >
+                <div className="mb-1.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
+                  {f.func === 'scenario' ? 'YOUR SCENARIO' : f.func === 'top level' ? (trace.example ? 'VALUES' : 'TOP LEVEL') : `${f.func.toUpperCase()}()`}
+                </div>
+                {locals.length === 0 ? (
+                  <span className="text-[11.5px] text-muted-foreground">no variables yet</span>
+                ) : (
+                  <div className="flex flex-col gap-1.5">
+                    {locals.map(([name, v]) => (
+                      <div
+                        key={name}
+                        className={cn('flex items-start gap-2 rounded px-1 py-0.5 transition-colors', diff.has(`${fi}:${name}`) && LIT, !v && 'opacity-45')}
+                      >
+                        <span className="shrink-0 pt-1 font-mono text-[12px] text-heading">{name}</span>
+                        {/* In an example, a value made later stays in its place, faded, so the box never jumps. */}
+                        {v ? <ValueView value={v} /> : <span className="pt-1 text-[11.5px] text-muted-foreground italic">not made yet</span>}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {fi === step.frames.length - 1 && step.event === 'return' && step.returnValue && (
+                  <div className="mt-1.5 flex items-start gap-2 border-t pt-1.5">
+                    <span className="pt-1 font-mono text-[11px] text-muted-foreground">returns</span>
+                    <ValueView value={step.returnValue} />
+                  </div>
+                )}
               </div>
-              {(trace.example ? localsWithPending(steps, fi, f) : f.locals).length === 0 ? (
-                <span className="text-[11.5px] text-muted-foreground">no variables yet</span>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {(trace.example ? localsWithPending(steps, fi, f) : f.locals).map(([name, v]) => (
-                    <div
-                      key={name}
-                      className={cn('flex items-start gap-2 rounded px-1 py-0.5 transition-colors', diff.has(`${fi}:${name}`) && LIT, !v && 'opacity-45')}
-                    >
-                      <span className="shrink-0 pt-1 font-mono text-[12px] text-heading">{name}</span>
-                      {/* In an example, a value made later stays in its place, faded, so the box never jumps. */}
-                      {v ? <ValueView value={v} /> : <span className="pt-1 text-[11.5px] text-muted-foreground italic">not made yet</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-              {fi === step.frames.length - 1 && step.event === 'return' && step.returnValue && (
-                <div className="mt-1.5 flex items-start gap-2 border-t pt-1.5">
-                  <span className="pt-1 font-mono text-[11px] text-muted-foreground">returns</span>
-                  <ValueView value={step.returnValue} />
-                </div>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </div>
       </div>
 
       {trace.example ? (
-        <Story steps={steps} at={i} shown={shown} onPick={setI} one={oneAtATime} />
+        <Story steps={steps} story={story} at={i} shown={shown} onPick={setI} one={oneAtATime} />
       ) : (
         <div
           className={cn(
@@ -284,4 +292,4 @@ export function TracePlayer({ trace, compact = false }: { trace: Trace; compact?
       {trace.stopped && <p className="text-[11.5px] text-muted-foreground">Note: {trace.stopped}</p>}
     </div>
   )
-}
+})

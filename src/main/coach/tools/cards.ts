@@ -2,12 +2,12 @@ import { Type } from 'typebox'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { Card } from '../../../shared/cards'
 import { PART_PATTERN } from '../../../shared/line-parts'
-import { StreamGuard, isCodeLine, isDataLiteral, pseudocodeProblem } from '../../core/guard'
+import { StreamGuard, exampleProblem, isCodeLine, pseudocodeProblem } from '../../core/guard'
 import { redactSecrets } from '../../core/paths'
 import { viewLines } from '../../core/text-view'
 import { summarizeTrace } from '../../core/trace-summary'
 import type { Animator, ProjectFiles } from '../../ports'
-import type { Trace, TraceValue } from '../../../shared/trace'
+import type { Trace } from '../../../shared/trace'
 import { visibleSteps } from '../../../shared/example-steps'
 
 /**
@@ -91,7 +91,6 @@ export function createVisualTools(
   files: string[] | undefined
 ): AgentTool<any>[] {
   const allowed = files ? new Set(files) : undefined
-  const resolveInside = ports.files.resolve
   const check = (card: Card) => {
     const problem = cardProblem(card)
     if (problem) throw new Error(problem)
@@ -153,7 +152,7 @@ export function createVisualTools(
     description: `Show the learner a few of THEIR OWN lines (max ${MAX_REF_LINES}) from a file, with the line to look at highlighted and a short note. Use this instead of describing where to look.`,
     parameters: RefParams,
     execute: async (_id, p) => {
-      const { abs, rel } = await resolveInside(root, p.path, allowed)
+      const { abs, rel } = await ports.files.resolve(root, p.path, allowed)
       const all = viewLines(rel, new TextDecoder().decode(await ports.files.read(abs)))
       const start = Math.min(Math.max(1, p.start_line), all.length)
       const end = Math.min(all.length, Math.max(start, p.end_line), start + MAX_REF_LINES - 1)
@@ -232,28 +231,29 @@ export function createVisualTools(
         if (why) throw new Error(`"${text.trim()}" is real code (${why}). Rewrite it as pseudocode.`)
         const method = l.method?.trim()
         if (method && !/^[A-Za-z_][\w.]*$/.test(method)) throw new Error(`method must be a name like Console.ReadLine, not "${method}".`)
-        const docUrl = https(l.doc_url)
+        const docUrl = method ? https(l.doc_url) : undefined
         // A part that isn't one name or symbol is dropped (it could never match the official line); no failed round.
-        const parts = method && docUrl ? (l.parts ?? []).map((x) => ({ part: x.part.trim(), says: x.says.trim() })).filter((x) => PART_PATTERN.test(x.part)) : []
+        const parts = docUrl ? (l.parts ?? []).map((x) => ({ part: x.part.trim(), says: x.says.trim() })).filter((x) => PART_PATTERN.test(x.part)) : []
         return {
           text,
           ...(method ? { method } : {}),
-          ...(method && docUrl ? { docUrl } : {}),
+          ...(docUrl ? { docUrl } : {}),
           ...(l.note ? { note: l.note } : {}),
           ...(parts.length ? { parts } : {})
         }
       })
+      const ideaUrl = https(p.idea?.doc_url)
       const idea = p.idea
         ? {
             term: p.idea.term,
             explanation: p.idea.explanation,
             ...(p.idea.doc_title ? { docTitle: p.idea.doc_title } : {}),
-            ...(https(p.idea.doc_url) ? { docUrl: https(p.idea.doc_url) } : {}),
+            ...(ideaUrl ? { docUrl: ideaUrl } : {}),
             ...(p.idea.level ? { level: p.idea.level } : {})
           }
         : undefined
       // Only a real file of theirs: the same sandbox as reading. An idea has no folder, so no place.
-      const anchor = root && p.at ? { path: (await resolveInside(root, p.at.path, allowed)).rel, line: p.at.line } : undefined
+      const anchor = root && p.at ? { path: (await ports.files.resolve(root, p.at.path, allowed)).rel, line: p.at.line } : undefined
       const card: Card = {
         kind: 'step',
         title: p.title,
@@ -325,40 +325,21 @@ export function createVisualTools(
       "Show an idea in motion with the animator: you write a small Python example, BetterCoder runs it in a sandbox, and the learner steps through how the variables change (lists, dicts and objects drawn as boxes) and what it prints. They never see your code, so it does not break the no-code rule; never repeat it in text or cards. Prefer this over a diagram to show what data looks like as it changes (serializing, sorting, loops, references). Python only. Prints and text values must be data, not code.",
     parameters: ExampleParams,
     execute: async (_id, p) => {
-      {
-        const ran = await ports.animator.runExample(p.python)
-        // The code stays here: the window gets the variables and output only.
-        const trace: Trace = { ...ran, file: 'example', source: [], scenario: [], example: true, steps: visibleSteps(ran.steps).map((s) => ({ ...s, file: 'example' })) }
-        const shownText = exampleText(trace)
-        for (const t of shownText) if (isCodeLine(t) && !isDataLiteral(t)) throw new Error(`The example shows code to the learner ("${t.slice(0, 80)}"). Print and keep data only, in plain values.`)
-        const card: Card = { kind: 'animation', title: p.title, note: p.note, trace }
-        check(card)
-        return {
-          content: [{ type: 'text' as const, text: `Shown to the learner as an animation (your code stays hidden).\n${summarizeTrace(trace)}` }],
-          details: card
-        }
+      const ran = await ports.animator.runExample(p.python)
+      // The code stays here: the window gets the variables and output only.
+      const trace: Trace = { ...ran, file: 'example', source: [], scenario: [], example: true, steps: visibleSteps(ran.steps).map((s) => ({ ...s, file: 'example' })) }
+      const problem = exampleProblem(trace)
+      if (problem) throw new Error(problem)
+      const card: Card = { kind: 'animation', title: p.title, note: p.note, trace }
+      check(card)
+      return {
+        content: [{ type: 'text' as const, text: `Shown to the learner as an animation (your code stays hidden).\n${summarizeTrace(trace)}` }],
+        details: card
       }
     }
   }
 
   return [ask, diagram, pointTo, step, animate, example] as AgentTool<any>[]
-}
-
-/** Every line of text an example puts on screen: printed output and text values. */
-function exampleText(trace: Trace): string[] {
-  const out = new Set<string>()
-  const visit = (v: TraceValue) => {
-    if (v.t === 'str') for (const l of String(v.v).split('\n')) out.add(l.trim())
-    else if (v.t === 'list') v.items.forEach(visit)
-    else if (v.t === 'dict') v.entries.forEach(([k, x]) => (visit(k), visit(x)))
-    else if (v.t === 'obj') v.fields.forEach(([, x]) => visit(x))
-  }
-  for (const s of trace.steps) {
-    for (const f of s.frames) for (const [, v] of f.locals) visit(v)
-    if (s.returnValue) visit(s.returnValue)
-  }
-  for (const l of (trace.steps.at(-1)?.output ?? '').split('\n')) out.add(l.trim())
-  return [...out].filter(Boolean)
 }
 
 export const VISUAL_TOOL_NAMES = new Set([

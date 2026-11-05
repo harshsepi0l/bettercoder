@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { Folder, MessageSquare, PanelLeft, Pin, PinOff, Settings } from 'lucide-react'
+import { MessageSquare, PanelLeft, Pin, PinOff, Settings } from 'lucide-react'
+import { ProjectIcon } from './sidebar'
+import { projectKind } from '../../../../shared/workspace'
 import type { ProjectInfo } from '../../../../shared/ipc'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -60,7 +62,7 @@ export function TitleBar({
           className="flex min-w-0 flex-1 items-center gap-1.5 text-xs"
           title={project.root ? project.root.replace(/^\/Users\/[^/]+/, '~') : 'No folder yet'}
         >
-          <Folder className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <ProjectIcon kind={projectKind(project)} className="text-muted-foreground" />
           <span className="max-w-[40%] shrink-0 truncate text-muted-foreground">{project.name}</span>
           {sessionTitle && (
             <>

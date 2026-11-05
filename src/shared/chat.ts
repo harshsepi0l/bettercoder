@@ -85,9 +85,14 @@ export function coachTurns(items: readonly { kind: string }[]): Array<{ from: nu
   return out
 }
 
+/** A chat item that is an animation card: the one rule for "this session has an animation". */
+export function isAnimationCard(item: ChatItem): item is { kind: 'card'; id: string; card: Extract<Card, { kind: 'animation' }> } {
+  return item.kind === 'card' && item.card.kind === 'animation'
+}
+
 /** Every animation the coach showed in this session, oldest first, for the Visualize tab. */
 export function animationsFromChat(items: readonly ChatItem[]): Array<{ id: string; card: Extract<Card, { kind: 'animation' }> }> {
-  return items.flatMap((item) => (item.kind === 'card' && item.card.kind === 'animation' ? [{ id: item.id, card: item.card }] : []))
+  return items.filter(isAnimationCard).map((item) => ({ id: item.id, card: item.card }))
 }
 
 /**
@@ -96,5 +101,5 @@ export function animationsFromChat(items: readonly ChatItem[]): Array<{ id: stri
  */
 export function lockedSections(isIdea: boolean, items: readonly ChatItem[]): Array<'visualize' | 'map'> {
   if (!isIdea) return []
-  return animationsFromChat(items).length > 0 ? ['map'] : ['visualize', 'map']
+  return items.some(isAnimationCard) ? ['map'] : ['visualize', 'map']
 }
