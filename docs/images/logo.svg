@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="BetterCoder">
+  <rect width="64" height="64" rx="15" fill="#8B1E2D"/>
+  <path d="M24 14c-6 0-7 3-7 8v4c0 4-2 6-5 6 3 0 5 2 5 6v4c0 5 1 8 7 8M40 14c6 0 7 3 7 8v4c0 4 2 6 5 6-3 0-5 2-5 6v4c0 5-1 8-7 8" fill="none" stroke="#ffffff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 23l2.6 6.4L41 32l-6.4 2.6L32 41l-2.6-6.4L23 32l6.4-2.6z" fill="#F1A2AB"/>
+</svg>
