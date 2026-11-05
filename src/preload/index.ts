@@ -1,0 +1,74 @@
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
+import { IPC, type BetterCoderApi } from '../shared/ipc'
+import { HARNESS_IPC, type AuthUiEvent, type HarnessApi, type HarnessEvent } from '../shared/harness'
+import { WORKSPACE_IPC, type WorkspaceApi } from '../shared/workspace'
+import { VISUALIZE_IPC, type VisualizeApi } from '../shared/visualize'
+import { MAP_IPC, type MapApi } from '../shared/map'
+import { IDE_IPC, type IdeApi, type IdeView } from '../shared/ide'
+
+const api: BetterCoderApi = {
+  platform: process.platform,
+  setPinned: (pinned) => ipcRenderer.invoke(IPC.setPinned, pinned)
+}
+
+function listen<T>(channel: string, listener: (value: T) => void): () => void {
+  const handler = (_e: IpcRendererEvent, value: T) => listener(value)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
+
+const harness: HarnessApi = {
+  send: (text, intent) => ipcRenderer.invoke(HARNESS_IPC.send, text, intent),
+  abort: () => ipcRenderer.invoke(HARNESS_IPC.abort),
+  cardUse: (kind) => ipcRenderer.invoke(HARNESS_IPC.cardUse, kind),
+  onEvent: (listener) => listen<HarnessEvent>(HARNESS_IPC.event, listener),
+  getSettings: () => ipcRenderer.invoke(HARNESS_IPC.getSettings),
+  login: (provider, kind) => ipcRenderer.invoke(HARNESS_IPC.login, provider, kind),
+  answerPrompt: (id, value) => ipcRenderer.invoke(HARNESS_IPC.answerPrompt, id, value),
+  cancelLogin: () => ipcRenderer.invoke(HARNESS_IPC.cancelLogin),
+  logout: (provider) => ipcRenderer.invoke(HARNESS_IPC.logout, provider),
+  setModel: (provider, id) => ipcRenderer.invoke(HARNESS_IPC.setModel, provider, id),
+  setProfile: (profile) => ipcRenderer.invoke(HARNESS_IPC.setProfile, profile),
+  setSkill: (language, topic, level) => ipcRenderer.invoke(HARNESS_IPC.setSkill, language, topic, level),
+  forgetSkill: (language, topic) => ipcRenderer.invoke(HARNESS_IPC.forgetSkill, language, topic),
+  onAuthEvent: (listener) => listen<AuthUiEvent>(HARNESS_IPC.authEvent, listener)
+}
+
+const workspace: WorkspaceApi = {
+  list: () => ipcRenderer.invoke(WORKSPACE_IPC.list),
+  open: (mode) => ipcRenderer.invoke(WORKSPACE_IPC.open, mode),
+  startIdea: (idea) => ipcRenderer.invoke(WORKSPACE_IPC.startIdea, idea),
+  linkFolder: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.linkFolder, projectId),
+  newSession: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.newSession, projectId),
+  openSession: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.openSession, sessionId),
+  renameSession: (sessionId, title) => ipcRenderer.invoke(WORKSPACE_IPC.renameSession, sessionId, title),
+  deleteSession: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.deleteSession, sessionId),
+  deleteProject: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.deleteProject, projectId),
+  onChanged: (listener) => listen<void>(WORKSPACE_IPC.changed, () => listener())
+}
+
+const visualize: VisualizeApi = {
+  files: () => ipcRenderer.invoke(VISUALIZE_IPC.files),
+  outline: (file) => ipcRenderer.invoke(VISUALIZE_IPC.outline, file),
+  run: (file, scenario) => ipcRenderer.invoke(VISUALIZE_IPC.run, file, scenario)
+}
+
+const codeMap: MapApi = {
+  build: () => ipcRenderer.invoke(MAP_IPC.build),
+  stackDocs: () => ipcRenderer.invoke(MAP_IPC.stackDocs),
+  docExample: (url, term) => ipcRenderer.invoke(MAP_IPC.docExample, url, term)
+}
+
+const ide: IdeApi = {
+  getState: () => ipcRenderer.invoke(IDE_IPC.getState),
+  onState: (listener) => listen<IdeView>(IDE_IPC.state, listener),
+  openFolder: () => ipcRenderer.invoke(IDE_IPC.openFolder),
+  openInEditor: (path, line) => ipcRenderer.invoke(IDE_IPC.openInEditor, path, line)
+}
+
+contextBridge.exposeInMainWorld('bettercoder', api)
+contextBridge.exposeInMainWorld('ide', ide)
+contextBridge.exposeInMainWorld('codeMap', codeMap)
+contextBridge.exposeInMainWorld('visualize', visualize)
+contextBridge.exposeInMainWorld('workspace', workspace)
+contextBridge.exposeInMainWorld('harness', harness)

@@ -1,0 +1,111 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+@custom-variant dark (&:is(.dark *));
+
+/* BetterCoder theme: Mantine-style greys, dark maroon primary. Dark only for v0. */
+:root {
+  --radius: 0.5rem;
+
+  --background: #242424;
+  --foreground: #c9c9c9;
+  --card: #2e2e2e;
+  --card-foreground: #c9c9c9;
+  --popover: #2e2e2e;
+  --popover-foreground: #ffffff;
+  --primary: #8b1e2d;
+  --primary-foreground: #ffffff;
+  --secondary: #2e2e2e;
+  --secondary-foreground: #ffffff;
+  --muted: #2a2a2a;
+  --muted-foreground: #a8a8a8;
+  --accent: #3b3b3b;
+  --accent-foreground: #ffffff;
+  --destructive: #e03131;
+  --border: #424242;
+  --input: #424242;
+  --ring: #c0394b;
+
+  /* BetterCoder extras */
+  --chrome: #1f1f1f;
+  --divider: #3b3b3b;
+  --heading: #ffffff;
+  --brand-line: #c0394b;
+  --brand-text: #f1a2ab;
+  --brand-tint: #3a1a1f;
+  --status-done: #69db7c;
+  --status-progress: #fbbf24;
+  --status-stub: #a8a8a8;
+  --status-missing: #fb7185;
+}
+
+@theme inline {
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, Menlo, monospace;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chrome: var(--chrome);
+  --color-divider: var(--divider);
+  --color-heading: var(--heading);
+  --color-brand-line: var(--brand-line);
+  --color-brand-text: var(--brand-text);
+  --color-brand-tint: var(--brand-tint);
+  --color-status-done: var(--status-done);
+  --color-status-progress: var(--status-progress);
+  --color-status-stub: var(--status-stub);
+  --color-status-missing: var(--status-missing);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    margin: 0;
+    overflow: hidden;
+    user-select: none;
+  }
+  input,
+  textarea {
+    user-select: text;
+  }
+}
+
+/* Electron window dragging */
+.app-drag {
+  -webkit-app-region: drag;
+}
+.app-no-drag {
+  -webkit-app-region: no-drag;
+}

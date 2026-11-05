@@ -1,0 +1,97 @@
+<html><body>
+<dt class="sig sig-object py" id="input">
+<span class="sig-name descname"><span class="pre">input</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#input" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="sig-name descname"><span class="pre">input</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">prompt</span></span></em>, <em class="sig-param"><span class="positional-only-separator o"><abbr title="Positional-only parameter separator (PEP 570)"><span class="pre">/</span></abbr></span></em><span class="sig-paren">)</span></dt>
+<dd><p>If the <em>prompt</em> argument is present, it is written to standard output without
+a trailing newline.  The function then reads a line from input, converts it
+to a string (stripping a trailing newline), and returns that.  When EOF is
+read, <a class="reference internal" href="exceptions.html#EOFError" title="EOFError"><code class="xref py py-exc docutils literal notranslate"><span class="pre">EOFError</span></code></a> is raised.  Example:</p>
+<div class="highlight-python3 notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">s</span> <span class="o">=</span> <span class="nb">input</span><span class="p">(</span><span class="s1">'--&gt; '</span><span class="p">)</span>
+<span class="go">--&gt; Monty Python's Flying Circus</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">s</span>
+<span class="go">"Monty Python's Flying Circus"</span>
+</pre></div>
+</div>
+<p>If the <a class="reference internal" href="../library/readline.html#module-readline" title="readline: GNU readline support for Python."><code class="xref py py-mod docutils literal notranslate"><span class="pre">readline</span></code></a> module was loaded, then <code class="xref py py-func docutils literal notranslate"><span class="pre">input()</span></code> will use it
+to provide elaborate line editing and history features.</p>
+<p class="audit-hook"><p>Raises an <a class="reference internal" href="../library/sys.html#auditing"><span class="std std-ref">auditing event</span></a> <code class="docutils literal notranslate"><span class="pre">builtins.input</span></code> with
+argument <code class="docutils literal notranslate"><span class="pre">prompt</span></code> before reading input</p>
+</p>
+<p class="audit-hook"><p>Raises an <a class="reference internal" href="../library/sys.html#auditing"><span class="std std-ref">auditing event</span></a> <code class="docutils literal notranslate"><span class="pre">builtins.input/result</span></code>
+with the result after successfully reading input.</p>
+</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="int">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">int</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">number</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="positional-only-separator o"><abbr title="Positional-only parameter separator (PEP 570)"><span class="pre">/</span></abbr></span></em><span class="sig-paren">)</span><a class="headerlink" href="#int" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object py">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">int</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">string</span></span></em>, <em class="sig-param"><span class="positional-only-separator o"><abbr title="Positional-only parameter separator (PEP 570)"><span class="pre">/</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">base</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">10</span></span></em><span class="sig-paren">)</span></dt>
+<dd><p>Return an integer object constructed from a number or a string, or return
+<code class="docutils literal notranslate"><span class="pre">0</span></code> if no arguments are given.</p>
+<p>Examples:</p>
+<div class="highlight-pycon notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="nb">int</span><span class="p">(</span><span class="mf">123.45</span><span class="p">)</span>
+<span class="go">123</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">int</span><span class="p">(</span><span class="s1">'123'</span><span class="p">)</span>
+<span class="go">123</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">int</span><span class="p">(</span><span class="s1">'   -12_345</span><span class="se">\n</span><span class="s1">'</span><span class="p">)</span>
+<span class="go">-12345</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">int</span><span class="p">(</span><span class="s1">'FACE'</span><span class="p">,</span> <span class="mi">16</span><span class="p">)</span>
+<span class="go">64206</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">int</span><span class="p">(</span><span class="s1">'0xface'</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+<span class="go">64206</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">int</span><span class="p">(</span><span class="s1">'01110011'</span><span class="p">,</span> <span class="n">base</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+<span class="go">115</span>
+</pre></div>
+</div>
+<p>If the argument defines <a class="reference internal" href="../reference/datamodel.html#object.__int__" title="object.__int__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">__int__()</span></code></a>,
+<code class="docutils literal notranslate"><span class="pre">int(x)</span></code> returns <code class="docutils literal notranslate"><span class="pre">x.__int__()</span></code>.  If the argument defines
+<a class="reference internal" href="../reference/datamodel.html#object.__index__" title="object.__index__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">__index__()</span></code></a>, it returns <code class="docutils literal notranslate"><span class="pre">x.__index__()</span></code>.
+For floating-point numbers, this truncates towards zero.</p>
+<p>If the argument is not a number or if <em>base</em> is given, then it must be a string,
+<a class="reference internal" href="stdtypes.html#bytes" title="bytes"><code class="xref py py-class docutils literal notranslate"><span class="pre">bytes</span></code></a>, or <a class="reference internal" href="stdtypes.html#bytearray" title="bytearray"><code class="xref py py-class docutils literal notranslate"><span class="pre">bytearray</span></code></a> instance representing an integer
+in radix <em>base</em>.  Optionally, the string can be preceded by <code class="docutils literal notranslate"><span class="pre">+</span></code> or <code class="docutils literal notranslate"><span class="pre">-</span></code>
+(with no space in between), have leading zeros, be surrounded by whitespace,
+and have single underscores interspersed between digits.</p>
+<p>A base-n integer string contains digits, each representing a value from 0 to
+n-1. The values 0–9 can be represented by any Unicode decimal digit. The
+values 10–35 can be represented by <code class="docutils literal notranslate"><span class="pre">a</span></code> to <code class="docutils literal notranslate"><span class="pre">z</span></code> (or <code class="docutils literal notranslate"><span class="pre">A</span></code> to <code class="docutils literal notranslate"><span class="pre">Z</span></code>). The
+default <em>base</em> is 10. The allowed bases are 0 and 2–36. Base-2, -8, and -16
+strings can be optionally prefixed with <code class="docutils literal notranslate"><span class="pre">0b</span></code>/<code class="docutils literal notranslate"><span class="pre">0B</span></code>, <code class="docutils literal notranslate"><span class="pre">0o</span></code>/<code class="docutils literal notranslate"><span class="pre">0O</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">0x</span></code>/<code class="docutils literal notranslate"><span class="pre">0X</span></code>, as with integer literals in code.  For base 0, the string is
+interpreted in a similar way to an <a class="reference internal" href="../reference/lexical_analysis.html#integers"><span class="std std-ref">integer literal in code</span></a>,
+in that the actual base is 2, 8, 10, or 16 as determined by the prefix. Base
+0 also disallows leading zeros: <code class="docutils literal notranslate"><span class="pre">int('010',</span> <span class="pre">0)</span></code> is not legal, while
+<code class="docutils literal notranslate"><span class="pre">int('010')</span></code> and <code class="docutils literal notranslate"><span class="pre">int('010',</span> <span class="pre">8)</span></code> are.</p>
+<p>The integer type is described in <a class="reference internal" href="stdtypes.html#typesnumeric"><span class="std std-ref">Numeric Types — int, float, complex</span></a>.</p>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 3.4: </span>If <em>base</em> is not an instance of <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> and the <em>base</em> object has a
+<a class="reference internal" href="../reference/datamodel.html#object.__index__" title="object.__index__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">base.__index__</span></code></a> method, that method is called
+to obtain an integer for the base.  Previous versions used
+<a class="reference internal" href="../reference/datamodel.html#object.__int__" title="object.__int__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">base.__int__</span></code></a> instead of <code class="xref py py-meth docutils literal notranslate"><span class="pre">base.__index__</span></code>.</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 3.6: </span>Grouping digits with underscores as in code literals is allowed.</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 3.7: </span>The first parameter is now positional-only.</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 3.8: </span>Falls back to <a class="reference internal" href="../reference/datamodel.html#object.__index__" title="object.__index__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">__index__()</span></code></a> if <a class="reference internal" href="../reference/datamodel.html#object.__int__" title="object.__int__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">__int__()</span></code></a> is not defined.</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 3.11: </span><code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> string inputs and string representations can be limited to
+help avoid denial of service attacks. A <a class="reference internal" href="exceptions.html#ValueError" title="ValueError"><code class="xref py py-exc docutils literal notranslate"><span class="pre">ValueError</span></code></a> is raised when
+the limit is exceeded while converting a string to an <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> or
+when converting an <code class="xref py py-class docutils literal notranslate"><span class="pre">int</span></code> into a string would exceed the limit.
+See the <a class="reference internal" href="stdtypes.html#int-max-str-digits"><span class="std std-ref">integer string conversion length limitation</span></a> documentation.</p>
+</div>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 3.14: </span><a class="reference internal" href="#int" title="int"><code class="xref py py-func docutils literal notranslate"><span class="pre">int()</span></code></a> no longer delegates to the <a class="reference internal" href="../reference/datamodel.html#object.__trunc__" title="object.__trunc__"><code class="xref py py-meth docutils literal notranslate"><span class="pre">__trunc__()</span></code></a> method.</p>
+</div>
+</dd></dl>
+
+<dl class="py function">
+
+</body></html>

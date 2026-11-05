@@ -1,0 +1,18 @@
+{
+  "name": "bettercoder-ide",
+  "displayName": "BetterCoder",
+  "description": "Links your editor to the BetterCoder coach: it sees where you are, marks where to write, and shows the step's pseudocode faded. It never writes into your files.",
+  "version": "0.1.0",
+  "publisher": "bettercoder",
+  "private": true,
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Education"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "bettercoder.reconnect", "title": "BetterCoder: Reconnect" },
+      { "command": "bettercoder.goToStep", "title": "BetterCoder: Go to the current step" }
+    ]
+  }
+}

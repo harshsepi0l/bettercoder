@@ -1,0 +1,79 @@
+<html><body>
+<h2 id="examples" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#examples">Examples</a></h2><!--/lit-part-->
+    <?>
+  </section><section
+    class="content-section"
+    aria-labelledby="using_parseint"
+  >
+    <!--lit-part mLzeP1rFqGE=--><!--lit-node 0--><h3 id="using_parseint" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#using_parseint">Using parseInt()</a></h3><!--/lit-part-->
+    <p>The following examples all return <code>15</code>:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>parseInt("0xF", 16);
+parseInt("F", 16);
+parseInt("17", 8);
+parseInt("015", 10);
+parseInt("15,123", 10);
+parseInt("FXX123", 16);
+parseInt("1111", 2);
+parseInt("15 * 3", 10);
+parseInt("15e2", 10);
+parseInt("15px", 10);
+parseInt("12", 13);
+</code></pre></div>
+<p>The following examples all return <code>NaN</code>:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>parseInt("Hello", 8); // Not a number at all
+parseInt("546", 2); // Digits other than 0 or 1 are invalid for binary radix
+</code></pre></div>
+<p>The following examples all return <code>-15</code>:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>parseInt("-F", 16);
+parseInt("-0F", 16);
+parseInt("-0XF", 16);
+parseInt("-17", 8);
+parseInt("-15", 10);
+parseInt("-1111", 2);
+parseInt("-15e1", 10);
+parseInt("-12", 13);
+</code></pre></div>
+<p>The following example returns <code>224</code>:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>parseInt("0e0", 16);
+</code></pre></div>
+<p><code>parseInt()</code> does not handle <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt"><code>BigInt</code></a> values. It stops at the <code>n</code> character, and treats the preceding string as a normal integer, with possible loss of precision.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js example-bad notranslate"><code>parseInt("900719925474099267n");
+// 900719925474099300
+</code></pre></div>
+<p>You should pass the string to the <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/BigInt/BigInt"><code>BigInt()</code></a> function instead, without the trailing <code>n</code> character.</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js example-good notranslate"><code>BigInt("900719925474099267");
+// 900719925474099267n
+</code></pre></div>
+<p><code>parseInt</code> doesn't work with <a href="/en-US/docs/Web/JavaScript/Reference/Lexical_grammar#numeric_separators">numeric separators</a>:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js example-bad notranslate"><code>parseInt("123_456"); // 123
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="using_parseint_on_non-strings"
+  >
+    <!--lit-part EK1k2NdHgLQ=--><!--lit-node 0--><h3 id="using_parseint_on_non-strings" class="heading"><!--lit-node 1--><a class="heading-anchor" href="#using_parseint_on_non-strings">Using parseInt() on non-strings</a></h3><!--/lit-part-->
+    <p><code>parseInt()</code> can have interesting results when working on non-strings combined with a high radix; for example, <code>36</code> (which makes all alphanumeric characters valid numeric digits).</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>parseInt(null, 36); // 1112745: The string "null" is 1112745 in base 36
+parseInt(undefined, 36); // 86464843759093: The string "undefined" is 86464843759093 in base 36
+</code></pre></div>
+<p>In general, it's a bad idea to use <code>parseInt()</code> on non-strings, especially to use it as a substitution for <a href="/en-US/docs/Web/JavaScript/Reference/Global_Objects/Math/trunc"><code>Math.trunc()</code></a>. It may work on small numbers:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js notranslate"><code>parseInt(15.99, 10); // 15
+parseInt(-15.1, 10); // -15
+</code></pre></div>
+<p>However, it only happens to work because the string representation of these numbers uses basic fractional notation (<code>"15.99"</code>, <code>"-15.1"</code>), where <code>parseInt()</code> stops at the decimal point. Numbers greater than or equal to 1e+21 or less than or equal to 1e-7 use exponential notation (<code>"1.5e+22"</code>, <code>"1.51e-8"</code>) in their string representation, and <code>parseInt()</code> will stop at the <code>e</code> character or decimal point, which always comes after the first digit. This means for large and small numbers, <code>parseInt()</code> will return a one-digit integer:</p>
+<div class="code-example"><div class="example-header"><span class="language-name">js</span></div><pre class="brush: js example-bad notranslate"><code>parseInt(4.7 * 1e22, 10); // Very large number becomes 4
+parseInt(0.00000000000434, 10); // Very small number becomes 4
+
+parseInt(0.0000001, 10); // 1
+parseInt(0.000000123, 10); // 1
+parseInt(1e-7, 10); // 1
+parseInt(1000000000000000000000, 10); // 1
+parseInt(123000000000000000000000, 10); // 1
+parseInt(1e21, 10); // 1
+</code></pre></div>
+  </section><section
+    class="content-section"
+    aria-labelledby="specifications"
+  >
+    <!--lit-part s915xX5HiM4=--><!--lit-node 0--><h2 
+</body></html>

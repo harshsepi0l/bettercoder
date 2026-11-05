@@ -1,0 +1,61 @@
+{
+  "name": "bettercoder",
+  "productName": "BetterCoder",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "A coding coach that sits beside your IDE and never writes your code.",
+  "type": "module",
+  "main": "./out/main/index.js",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "tsx --test tests/*.test.ts",
+    "ide:link": "node scripts/link-ide.mjs"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "electron": "^45.2.1",
+    "electron-vite": "^6.0.0",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5"
+  },
+  "dependencies": {
+    "@dagrejs/dagre": "^3.1.3",
+    "@earendil-works/chord": "^1.4.0",
+    "@earendil-works/pi-agent-core": "^1.4.0",
+    "@earendil-works/pi-ai": "^1.4.0",
+    "@earendil-works/pi-durable": "^1.4.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/geist-mono": "^5.3.0",
+    "@xyflow/react": "^12.12.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "cn": "^0.5.1",
+    "lucide-react": "^1.66.0",
+    "mermaid": "^12.2.0",
+    "radix-ui": "^1.8.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.7.0",
+    "ts5": "npm:typescript@^5.9.3",
+    "tw-animate-css": "^1.4.0",
+    "typebox": "^1.3.27"
+  },
+  "allowScripts": {
+    "electron@45.2.1": true
+  }
+}

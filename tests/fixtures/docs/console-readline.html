@@ -1,0 +1,512 @@
+<html><body>
+<h2 id="definition">Definition</h2>
+
+<div class="metadata">
+		<dl class="attributeList">
+			<dt>Namespace:</dt>
+			<dd>
+				<span class="break-text"> <a class="xref" href="system?view=net-10.0" data-linktype="relative-path">System</a> </span>
+			</dd>
+		</dl>
+
+
+		<dl class="attributeList" data-moniker=" net-10.0 net-11.0 net-5.0 net-6.0 net-7.0 net-8.0 net-9.0 ">
+			<dt>Assemblies:</dt><dd>netstandard.dll, System.Console.dll</dd>
+		</dl>
+		<dl class="attributeList" data-moniker=" netcore-1.0 netcore-1.1 netcore-2.0 netcore-2.1 netcore-2.2 netcore-3.0 netcore-3.1 netstandard-1.3 netstandard-1.4 netstandard-1.6 ">
+			<dt>Assembly:</dt><dd>System.Console.dll</dd>
+		</dl>
+		<dl class="attributeList" data-moniker=" netframework-1.1 netframework-2.0 netframework-3.0 netframework-3.5 netframework-4.0 netframework-4.5 netframework-4.5.1 netframework-4.5.2 netframework-4.6 netframework-4.6.1 netframework-4.6.2 netframework-4.7 netframework-4.7.1 netframework-4.7.2 netframework-4.8 netframework-4.8.1 ">
+			<dt>Assembly:</dt><dd>mscorlib.dll</dd>
+		</dl>
+		<dl class="attributeList" data-moniker=" netstandard-2.0 netstandard-2.1 ">
+			<dt>Assembly:</dt><dd>netstandard.dll</dd>
+		</dl>
+
+
+
+	<dl class="attributeList" data-moniker=" net-10.0 ">
+		<dt>Source:</dt><dd><a href="https://github.com/dotnet/dotnet/blob/b0f34d51fccc69fd334253924abd8d6853fad7aa/src/runtime/src/libraries/System.Console/src/System/Console.cs#L727C13-L727C34" data-linktype="external">Console.cs</a></dd>
+	</dl>
+	<dl class="attributeList" data-moniker=" net-11.0 ">
+		<dt>Source:</dt><dd><a href="https://github.com/dotnet/dotnet/blob/e2c1e00b3d0f96afb892fb261d5921565b400246/src/runtime/src/libraries/System.Console/src/System/Console.cs#L774C13-L774C34" data-linktype="external">Console.cs</a></dd>
+	</dl>
+	<dl class="attributeList" data-moniker=" net-7.0 ">
+		<dt>Source:</dt><dd><a href="https://github.com/dotnet/runtime/blob/d099f075e45d2aa6007a22b71b45a08758559f80/src/libraries/System.Console/src/System/Console.cs#L722C13-L722C34" data-linktype="external">Console.cs</a></dd>
+	</dl>
+	<dl class="attributeList" data-moniker=" net-8.0 ">
+		<dt>Source:</dt><dd><a href="https://github.com/dotnet/runtime/blob/5535e31a712343a63f5d7d796cd874e563e5ac14/src/libraries/System.Console/src/System/Console.cs#L752C13-L752C34" data-linktype="external">Console.cs</a></dd>
+	</dl>
+	<dl class="attributeList" data-moniker=" net-9.0 ">
+		<dt>Source:</dt><dd><a href="https://github.com/dotnet/runtime/blob/9d5a6a9aa463d6d10b0b0ba6d5982cc82f363dc3/src/libraries/System.Console/src/System/Console.cs#L727C13-L727C34" data-linktype="external">Console.cs</a></dd>
+	</dl>
+</div><div class="alert is-primary is-hidden moniker-display-boilerplate">
+    <p class="alert-title">
+      <span class="docon docon-status-info-outline" aria-hidden="true"></span> Important
+    </p>
+    <p>Some information relates to prerelease product that may be substantially modified before it’s released. Microsoft makes no warranties, express or implied, with respect to the information provided here.</p>
+</div>
+
+
+
+<div data-moniker=" net-10.0 net-11.0 net-5.0 net-6.0 net-7.0 net-8.0 net-9.0 netcore-1.0 netcore-1.1 netcore-2.0 netcore-2.1 netcore-2.2 netcore-3.0 netcore-3.1 netframework-1.1 netframework-2.0 netframework-3.0 netframework-3.5 netframework-4.0 netframework-4.5 netframework-4.5.1 netframework-4.5.2 netframework-4.6 netframework-4.6.1 netframework-4.6.2 netframework-4.7 netframework-4.7.1 netframework-4.7.2 netframework-4.8 netframework-4.8.1 netstandard-1.3 netstandard-1.4 netstandard-1.6 netstandard-2.0 netstandard-2.1 " class="anchor-headings">
+
+
+	<div class="summaryHolder">
+		<div class="summary clearFix has-text-wrap">
+			<p>Reads the next line of characters from the standard input stream.</p>
+
+		</div>
+	</div>
+	<pre class="wrap" data-moniker=" net-10.0 net-11.0 net-5.0 net-6.0 net-7.0 net-8.0 net-9.0 netcore-1.0 netcore-1.1 netcore-2.0 netcore-2.1 netcore-2.2 netcore-3.0 netcore-3.1 netframework-1.1 netframework-2.0 netframework-3.0 netframework-3.5 netframework-4.0 netframework-4.5 netframework-4.5.1 netframework-4.5.2 netframework-4.6 netframework-4.6.1 netframework-4.6.2 netframework-4.7 netframework-4.7.1 netframework-4.7.2 netframework-4.8 netframework-4.8.1 netstandard-1.3 netstandard-1.4 netstandard-1.6 netstandard-2.0 netstandard-2.1 "><code class="cpp lang-cpp" dir="ltr">public:
+ static System::String ^ ReadLine();</code></pre>
+	<pre class="wrap" data-moniker=" net-10.0 net-11.0 net-6.0 net-7.0 net-8.0 net-9.0 "><code class="csharp lang-csharp" dir="ltr">[System.Runtime.Versioning.UnsupportedOSPlatform("android")]
+[System.Runtime.Versioning.UnsupportedOSPlatform("browser")]
+public static string? ReadLine();</code></pre>
+	<pre class="wrap" data-moniker=" net-5.0 "><code class="csharp lang-csharp" dir="ltr">[System.Runtime.Versioning.UnsupportedOSPlatform("browser")]
+public static string? ReadLine();</code></pre>
+	<pre class="wrap" data-moniker=" netcore-1.0 netcore-1.1 netcore-2.0 netcore-2.1 netcore-2.2 netcore-3.0 netcore-3.1 netframework-1.1 netframework-2.0 netframework-3.0 netframework-3.5 netframework-4.0 netframework-4.5 netframework-4.5.1 netframework-4.5.2 netframework-4.6 netframework-4.6.1 netframework-4.6.2 netframework-4.7 netframework-4.7.1 netframework-4.7.2 netframework-4.8 netframework-4.8.1 netstandard-1.3 netstandard-1.4 netstandard-1.6 netstandard-2.0 netstandard-2.1 "><code class="csharp lang-csharp" dir="ltr">public static string ReadLine();</code></pre>
+	<pre class="wrap" data-moniker=" net-10.0 net-11.0 net-6.0 net-7.0 net-8.0 net-9.0 "><code class="fsharp lang-fsharp" dir="ltr">[&lt;System.Runtime.Versioning.UnsupportedOSPlatform("android")&gt;]
+[&lt;System.Runtime.Versioning.UnsupportedOSPlatform("browser")&gt;]
+static member ReadLine : unit -&gt; string</code></pre>
+	<pre class="wrap" data-moniker=" net-5.0 "><code class="fsharp lang-fsharp" dir="ltr">[&lt;System.Runtime.Versioning.UnsupportedOSPlatform("browser")&gt;]
+static member ReadLine : unit -&gt; string</code></pre>
+	<pre class="wrap" data-moniker=" netcore-1.0 netcore-1.1 netcore-2.0 netcore-2.1 netcore-2.2 netcore-3.0 netcore-3.1 netframework-1.1 netframework-2.0 netframework-3.0 netframework-3.5 netframework-4.0 netframework-4.5 netframework-4.5.1 netframework-4.5.2 netframework-4.6 netframework-4.6.1 netframework-4.6.2 netframework-4.7 netframework-4.7.1 netframework-4.7.2 netframework-4.8 netframework-4.8.1 netstandard-1.3 netstandard-1.4 netstandard-1.6 netstandard-2.0 netstandard-2.1 "><code class="fsharp lang-fsharp" dir="ltr">static member ReadLine : unit -&gt; string</code></pre>
+	<pre class="wrap" data-moniker=" net-10.0 net-11.0 net-5.0 net-6.0 net-7.0 net-8.0 net-9.0 netcore-1.0 netcore-1.1 netcore-2.0 netcore-2.1 netcore-2.2 netcore-3.0 netcore-3.1 netframework-1.1 netframework-2.0 netframework-3.0 netframework-3.5 netframework-4.0 netframework-4.5 netframework-4.5.1 netframework-4.5.2 netframework-4.6 netframework-4.6.1 netframework-4.6.2 netframework-4.7 netframework-4.7.1 netframework-4.7.2 netframework-4.8 netframework-4.8.1 netstandard-1.3 netstandard-1.4 netstandard-1.6 netstandard-2.0 netstandard-2.1 "><code class="vb lang-vb" dir="ltr">Public Shared Function ReadLine () As String</code></pre>
+	<h4 class="propertyInfoTitle stack">Returns</h4>
+
+
+
+	<div class="propertyInfo">
+		<a href="system.string?view=net-10.0" data-linktype="relative-path">String</a>
+		
+	</div>
+
+	<p>The next line of characters from the input stream, or <code data-dev-comment-type="langword">null</code> if no more lines are available.</p>
+
+
+	<dl class="attributeList stack" data-moniker=" net-10.0 net-11.0 net-6.0 net-7.0 net-8.0 net-9.0 net-5.0 ">
+		<dt>Attributes</dt>
+		<dd>
+			<div class="cdlHolder">
+					<span class="cdl break-text" data-moniker=" net-10.0 net-11.0 net-6.0 net-7.0 net-8.0 net-9.0 net-5.0 ">
+						<a class="xref" href="system.runtime.versioning.unsupportedosplatformattribute?view=net-10.0" title="System.Runtime.Versioning.UnsupportedOSPlatformAttribute" data-linktype="relative-path">UnsupportedOSPlatformAttribute</a></span>
+			</div>
+		</dd>
+	</dl>
+
+	<h4 class="propertyInfoTitle stack">Exceptions</h4>
+		<div class="propertyInfo">
+		    <div class="subtle">
+			    <a href="system.io.ioexception?view=net-10.0" data-linktype="relative-path">IOException</a>
+		    </div>
+		    <p>An I/O error occurred.</p>
+
+		</div>
+		<div class="propertyInfo stack">
+		    <div class="subtle">
+			    <a href="system.outofmemoryexception?view=net-10.0" data-linktype="relative-path">OutOfMemoryException</a>
+		    </div>
+		    <p>There is insufficient memory to allocate a buffer for the returned string.</p>
+
+		</div>
+		<div class="propertyInfo stack">
+		    <div class="subtle">
+			    <a href="system.argumentoutofrangeexception?view=net-10.0" data-linktype="relative-path">ArgumentOutOfRangeException</a>
+		    </div>
+		    <p>The number of characters in the next line of characters is greater than <a href="system.int32.maxvalue?view=net-10.0#system-int32-maxvalue" data-linktype="relative-path">Int32.MaxValue</a>.</p>
+
+		</div>
+
+	<h2>Examples</h2>
+	<p>The following example requires two command line arguments: the name of an existing text file, and the name of a file to write the output to. It opens the existing text file and redirects the standard input from the keyboard to that file. It also redirects the standard output from the console to the output file. It then uses the <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">Console.ReadLine</a> method to read each line in the file, replaces every sequence of four spaces with a tab character, and uses the <a href="system.console.writeline?view=net-10.0" class="no-loc" data-linktype="relative-path">Console.WriteLine</a> method to write the result to the output file.</p>
+<pre><code class="lang-csharp">using System;
+using System.IO;
+
+public class InsertTabs
+{
+    private const int tabSize = 4;
+    private const string usageText = "Usage: INSERTTABS inputfile.txt outputfile.txt";
+    public static int Main(string[] args)
+    {
+        if (args.Length &lt; 2)
+        {
+            Console.WriteLine(usageText);
+            return 1;
+        }
+
+        try
+        {
+            // Attempt to open output file.
+            using (var writer = new StreamWriter(args[1]))
+            {
+                using (var reader = new StreamReader(args[0]))
+                {
+                    // Redirect standard output from the console to the output file.
+                    Console.SetOut(writer);
+                    // Redirect standard input from the console to the input file.
+                    Console.SetIn(reader);
+                    string line;
+                    while ((line = Console.ReadLine()) != null)
+                    {
+                        string newLine = line.Replace(("").PadRight(tabSize, ' '), "\t");
+                        Console.WriteLine(newLine);
+                    }
+                }
+            }
+        }
+        catch(IOException e)
+        {
+            TextWriter errorWriter = Console.Error;
+            errorWriter.WriteLine(e.Message);
+            errorWriter.WriteLine(usageText);
+            return 1;
+        }
+
+        // Recover the standard output stream so that a
+        // completion message can be displayed.
+        var standardOutput = new StreamWriter(Console.OpenStandardOutput());
+        standardOutput.AutoFlush = true;
+        Console.SetOut(standardOutput);
+        Console.WriteLine($"INSERTTABS has completed the processing of {args[0]}.");
+        return 0;
+    }
+}
+</code></pre>
+<pre><code class="lang-fsharp">open System
+open System.IO
+
+let tabSize = 4
+let usageText = "Usage: INSERTTABS inputfile.txt outputfile.txt"
+
+[&lt;EntryPoint&gt;]
+let main args =
+    if args.Length &lt; 2 then
+        Console.WriteLine usageText
+        1
+    else
+        try
+            // Attempt to open output file.
+            use reader = new StreamReader(args[0])
+            use writer = new StreamWriter(args[1])
+            
+            // Redirect standard output from the console to the output file.
+            Console.SetOut writer
+            
+            // Redirect standard input from the console to the input file.
+            Console.SetIn reader
+            
+            let mutable line = Console.ReadLine()
+            while line &lt;&gt; null do
+                let newLine = line.Replace(("").PadRight(tabSize, ' '), "\t")
+                Console.WriteLine newLine
+                line &lt;- Console.ReadLine()
+
+            // Recover the standard output stream so that a
+            // completion message can be displayed.
+            let standardOutput = new StreamWriter(Console.OpenStandardOutput())
+            standardOutput.AutoFlush &lt;- true
+            Console.SetOut standardOutput
+            Console.WriteLine $"INSERTTABS has completed the processing of {args[0]}."
+            0
+
+        with :? IOException as e -&gt; 
+            let errorWriter = Console.Error
+            errorWriter.WriteLine e.Message
+            errorWriter.WriteLine usageText
+            1
+</code></pre>
+<pre><code class="lang-vb">Imports System.IO
+
+Public Module InsertTabs
+    Private Const tabSize As Integer = 4
+    Private Const usageText As String = "Usage: INSERTTABS inputfile.txt outputfile.txt"
+   
+    Public Function Main(args As String()) As Integer
+        If args.Length &lt; 2 Then
+            Console.WriteLine(usageText)
+            Return 1
+        End If
+      
+        Try
+            ' Attempt to open output file.
+            Using writer As New StreamWriter(args(1))
+                Using reader As New StreamReader(args(0))
+                    ' Redirect standard output from the console to the output file.
+                    Console.SetOut(writer)
+                    ' Redirect standard input from the console to the input file.
+                    Console.SetIn(reader)
+                    Dim line As String = Console.ReadLine()
+                    While line IsNot Nothing
+                        Dim newLine As String = line.Replace("".PadRight(tabSize, " "c), ControlChars.Tab)
+                        Console.WriteLine(newLine)
+                        line = Console.ReadLine()
+                    End While
+                End Using
+            End Using
+        Catch e As IOException
+            Dim errorWriter As TextWriter = Console.Error
+            errorWriter.WriteLine(e.Message)
+            errorWriter.WriteLine(usageText)
+            Return 1
+        End Try
+
+        ' Recover the standard output stream so that a 
+        ' completion message can be displayed.
+        Dim standardOutput As New StreamWriter(Console.OpenStandardOutput())
+        standardOutput.AutoFlush = True
+        Console.SetOut(standardOutput)
+        Console.WriteLine($"INSERTTABS has completed the processing of {args(0)}.")
+        Return 0
+    End Function 
+End Module
+</code></pre>
+
+
+	<h2>Remarks</h2>
+	<p>The <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method reads a line from the standard input stream. (For the definition of a line, see the paragraph after the following list.) This means that:</p>
+<ul>
+<li><p>If the standard input device is the keyboard, the <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method blocks until the user presses the <strong>Enter</strong> key.</p>
+<p>One of the most common uses of the <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method is to pause program execution before clearing the console and displaying new information to it, or to prompt the user to press the Enter key before terminating the application. The following example illustrates this.</p>
+<pre><code class="lang-csharp">using System;
+
+public class Example
+{
+   public static void Main()
+   {
+      Console.Clear();
+
+      DateTime dat = DateTime.Now;
+
+      Console.WriteLine("\nToday is {0:d} at {0:T}.", dat);
+      Console.Write("\nPress any key to continue... ");
+      Console.ReadLine();
+   }
+}
+// The example displays output like the following:
+//     Today is 10/26/2015 at 12:22:22 PM.
+//
+//     Press any key to continue...
+</code></pre>
+<pre><code class="lang-fsharp">open System
+
+Console.Clear()
+
+let dat = DateTime.Now
+
+printfn $"\nToday is {dat:d} at {dat:T}." 
+printf "\nPress any key to continue... "
+Console.ReadLine() |&gt; ignore
+
+// The example displays output like the following:
+//     Today is 12/28/2021 at 8:23:50 PM.
+//
+//     Press any key to continue...
+</code></pre>
+<pre><code class="lang-vb">Module Example
+   Public Sub Main()
+      Console.Clear()
+
+      Dim dat As Date = Date.Now
+
+      Console.WriteLine()
+      Console.WriteLine("Today is {0:d} at {0:T}.", dat)
+      Console.WriteLine()
+      Console.Write("Press any key to continue... ")
+      Console.ReadLine()
+   End Sub
+End Module
+' The example displays output like the following:
+'     Today is 10/26/2015 at 12:22:22 PM.
+'     
+'     Press any key to continue...
+</code></pre>
+</li>
+<li><p>If standard input is redirected to a file, the <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method reads a line of text from a file. For example, the following is a text file named ReadLine1.txt:</p>
+<pre><code>  This is the first line.
+  This is the second line.
+  This is the third line.
+  This is the fourth line.
+</code></pre>
+<p>The following example uses the <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method to read input that is redirected from a file. The read operation terminates when the method returns <code>null</code>, which indicates that no lines remain to be read.</p>
+<pre><code class="lang-csharp">using System;
+
+public class Example
+{
+   public static void Main()
+   {
+      if (!Console.IsInputRedirected) {
+         Console.WriteLine("This example requires that input be redirected from a file.");
+         return;
+      }
+
+      Console.WriteLine("About to call Console.ReadLine in a loop.");
+      Console.WriteLine("----");
+      String s;
+      int ctr = 0;
+      do {
+         ctr++;
+         s = Console.ReadLine();
+         Console.WriteLine("Line {0}: {1}", ctr, s);
+      } while (s != null);
+      Console.WriteLine("---");
+   }
+}
+// The example displays the following output:
+//       About to call Console.ReadLine in a loop.
+//       ----
+//       Line 1: This is the first line.
+//       Line 2: This is the second line.
+//       Line 3: This is the third line.
+//       Line 4: This is the fourth line.
+//       Line 5:
+//       ---
+</code></pre>
+<pre><code class="lang-fsharp">open System
+
+if not Console.IsInputRedirected then
+    printfn "This example requires that input be redirected from a file."
+
+printfn "About to call Console.ReadLine in a loop."
+printfn "----"
+
+let mutable s = ""
+let mutable i = 0
+
+while s &lt;&gt; null do
+    i &lt;- i + 1
+    s &lt;- Console.ReadLine()
+    printfn $"Line {i}: {s}"
+printfn "---"
+
+
+// The example displays the following output:
+//       About to call Console.ReadLine in a loop.
+//       ----
+//       Line 1: This is the first line.
+//       Line 2: This is the second line.
+//       Line 3: This is the third line.
+//       Line 4: This is the fourth line.
+//       Line 5:
+//       ---
+</code></pre>
+<pre><code class="lang-vb">Module Example
+   Public Sub Main()
+      If Not Console.IsInputRedirected Then
+         Console.WriteLine("This example requires that input be redirected from a file.")
+         Exit Sub 
+      End If
+
+      Console.WriteLine("About to call Console.ReadLine in a loop.")
+      Console.WriteLine("----")
+      Dim s As String
+      Dim ctr As Integer
+      Do
+         ctr += 1
+         s = Console.ReadLine()
+         Console.WriteLine("Line {0}: {1}", ctr, s)
+      Loop While s IsNot Nothing
+      Console.WriteLine("---")
+   End Sub
+End Module
+' The example displays the following output:
+'       About to call Console.ReadLine in a loop.
+'       ----
+'       Line 1: This is the first line.
+'       Line 2: This is the second line.
+'       Line 3: This is the third line.
+'       Line 4: This is the fourth line.
+'       Line 5:
+'       ---
+</code></pre>
+<p>After compiling the example to an executable named ReadLine1.exe, you can run it from the command line to read the contents of the file and display them to the console. The syntax is:</p>
+<pre><code>ReadLine1 &lt; ReadLine1.txt
+</code></pre>
+</li>
+</ul>
+<p>A line is defined as a sequence of characters followed by a carriage return (hexadecimal 0x000d), a line feed (hexadecimal 0x000a), or the value of the <a href="system.environment.newline?view=net-10.0#system-environment-newline" class="no-loc" data-linktype="relative-path">Environment.NewLine</a> property. The returned string does not contain the terminating character(s). By default, the method reads input from a 256-character input buffer. Because this includes the <a href="system.environment.newline?view=net-10.0" class="no-loc" data-linktype="relative-path">Environment.NewLine</a> character(s), the method can read lines that contain up to 254 characters. To read longer lines, call the <a href="system.console.openstandardinput?view=net-10.0#system-console-openstandardinput(system-int32)" class="no-loc" data-linktype="relative-path">OpenStandardInput(Int32)</a> method.</p>
+<p>The <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method executes synchronously. That is, it blocks until a line is read or the <kbd>Ctrl+Z</kbd> keyboard combination (followed by <kbd>Enter</kbd> on Windows), is pressed. The <a href="system.console.in?view=net-10.0#system-console-in" class="no-loc" data-linktype="relative-path">In</a> property returns a <a href="system.io.textreader?view=net-10.0" class="no-loc" data-linktype="relative-path">TextReader</a> object that represents the standard input stream and that has both a synchronous <a href="system.io.textreader.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">TextReader.ReadLine</a> method and an asynchronous <a href="system.io.textreader.readlineasync?view=net-10.0" class="no-loc" data-linktype="relative-path">TextReader.ReadLineAsync</a> method. However, when used as the console's standard input stream, the <a href="system.io.textreader.readlineasync?view=net-10.0" class="no-loc" data-linktype="relative-path">TextReader.ReadLineAsync</a> executes synchronously rather than asynchronously and returns a <code>Task&lt;String&gt;</code> only after the read operation has completed.</p>
+<p>If this method throws an <a href="system.outofmemoryexception?view=net-10.0" class="no-loc" data-linktype="relative-path">OutOfMemoryException</a> exception, the reader's position in the underlying <a href="system.io.stream?view=net-10.0" class="no-loc" data-linktype="relative-path">Stream</a> object is advanced by the number of characters the method was able to read, but the characters already read into the internal <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> buffer are discarded. Since the position of the reader in the stream cannot be changed, the characters already read are unrecoverable, and can be accessed only by reinitializing the <a href="system.io.textreader?view=net-10.0" class="no-loc" data-linktype="relative-path">TextReader</a>. If the initial position within the stream is unknown or the stream does not support seeking, the underlying <a href="system.io.stream?view=net-10.0" class="no-loc" data-linktype="relative-path">Stream</a> also needs to be reinitialized. To avoid such a situation and to produce robust code, you should use the <a href="system.console.keyavailable?view=net-10.0#system-console-keyavailable" class="no-loc" data-linktype="relative-path">KeyAvailable</a> property and <a href="system.console.readkey?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadKey</a> method and store the read characters in a pre-allocated buffer.</p>
+<p>If the <kbd>Ctrl+Z</kbd> key combination (followed by <kbd>Enter</kbd> on Windows) is pressed when the method is reading input from the console, the method returns <code>null</code>. This enables the user to prevent further keyboard input when the <a href="system.console.readline?view=net-10.0" class="no-loc" data-linktype="relative-path">ReadLine</a> method is called in a loop. The following example illustrates this scenario.</p>
+<pre><code class="lang-csharp">using System;
+
+public class Example
+{
+   public static void Main()
+   {
+      string line;
+      Console.WriteLine("Enter one or more lines of text (press CTRL+Z to exit):");
+      Console.WriteLine();
+      do {
+         Console.Write("   ");
+         line = Console.ReadLine();
+         if (line != null)
+            Console.WriteLine("      " + line);
+      } while (line != null);
+   }
+}
+// The following displays possible output from this example:
+//       Enter one or more lines of text (press CTRL+Z to exit):
+//
+//          This is line #1.
+//             This is line #1.
+//          This is line #2
+//             This is line #2
+//          ^Z
+//
+//       &gt;
+</code></pre>
+<pre><code class="lang-fsharp">open System
+
+printfn "Enter one or more lines of text (press CTRL+Z to exit):\n"
+
+let mutable line = ""
+
+while line &lt;&gt; null do
+    printf "   "
+    line &lt;- Console.ReadLine()
+    if line &lt;&gt; null then
+        printfn $"      {line}"
+
+
+// The following displays possible output from this example:
+//       Enter one or more lines of text (press CTRL+Z to exit):
+//
+//          This is line #1.
+//             This is line #1.
+//          This is line #2
+//             This is line #2
+//          ^Z
+//
+//       &gt;
+</code></pre>
+<pre><code class="lang-vb">Module Example
+   Public Sub Main()
+      Dim line As String
+      Console.WriteLine("Enter one or more lines of text (press CTRL+Z to exit):")
+      Console.WriteLine()
+      Do 
+         Console.Write("   ")
+         line = Console.ReadLine()
+         If line IsNot Nothing Then Console.WriteLine("      " + line)
+      Loop While line IsNot Nothing   
+   End Sub
+End Module
+' The following displays possible output from this example:
+'       Enter one or more lines of text (press CTRL+Z to exit):
+'       
+'          This is line #1.
+'             This is line #1.
+'          This is line #2
+'             This is line #2
+'          ^Z
+'       
+'       &gt;
+</code></pre>
+
+
+
+
+	<div data-no-chunk="" class="anchor-headings">
+	 
+</body></html>
