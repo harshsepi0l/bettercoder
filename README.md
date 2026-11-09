@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/hero.png" alt="BetterCoder with a C# calculator open: the built-in editor with line 8 written and the next pseudocode line faded on line 9, a terminal below, and the coach pane on the right with the current step and its first line ticked off">
+  <img src="docs/images/hero.png" alt="BetterCoder with a C# calculator open: VS Code in the Code tab with line 9 marked and the step's first pseudocode line faded there, and the coach pane on the right with the step card and the official example">
 </p>
 
 ## What it does
