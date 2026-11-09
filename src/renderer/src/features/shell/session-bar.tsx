@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Code, FolderOpen, FolderPlus, Plus } from 'lucide-react'
+import { FolderOpen, FolderPlus, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -45,13 +45,6 @@ export function SessionBar({ workspace, wide }: { workspace: Workspace; wide: bo
     </Button>
   )
 
-  // Opens the project in their editor (VS Code, Cursor…). Only opens; nothing is written.
-  const editorButton = active?.project.root && (
-    <Button size="sm" variant="ghost" aria-label="Open in editor" title="Open in editor" onClick={() => void window.ide.openInEditor()}>
-      <Code />
-      {wide && 'Open in editor'}
-    </Button>
-  )
 
   if (!wide) {
     return (
@@ -96,7 +89,6 @@ export function SessionBar({ workspace, wide }: { workspace: Workspace; wide: bo
         )}
         {menu}
         {linkButton}
-        {editorButton}
         {active && (
           <Button
             variant="ghost"
@@ -135,7 +127,6 @@ export function SessionBar({ workspace, wide }: { workspace: Workspace; wide: bo
       />
       <div className="flex-1" />
       {linkButton}
-      {editorButton}
     </div>
   )
 }

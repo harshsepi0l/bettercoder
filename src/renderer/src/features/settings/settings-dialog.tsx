@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { LearnerProfile } from '../../../../shared/profile'
 import { CodeViewPicker, SkillsView, StyleEditor } from '@/features/profile/profile-editor'
+import { EditorImport, useEditorSources } from '@/features/profile/editor-import'
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, LogIn, Search, X } from 'lucide-react'
 import type { ProviderId, ProviderStatus } from '../../../../shared/harness'
 import { Badge } from '@/components/ui/badge'
@@ -75,6 +76,8 @@ export function SettingsDialog({
             </Select>
           )}
         </section>
+
+        <EditorSection />
 
         <Separator />
 
@@ -352,5 +355,29 @@ function ConnectFlow({
       )}
       {failed && <p className="text-[12.5px] text-status-missing">{auth.message}</p>}
     </div>
+  )
+}
+
+/** Settings › Editor: bring their VS Code setup into the built-in VS Code (only when it is on). */
+function EditorSection() {
+  const editors = useEditorSources()
+  if (!editors?.enabled) return null
+  return (
+    <>
+      <Separator />
+      <section className="flex flex-col gap-3" aria-labelledby="editor-heading">
+        <div className="flex flex-col gap-1">
+          <Label id="editor-heading" className="text-heading">
+            Editor
+          </Label>
+          <p className="text-[13px] text-muted-foreground">
+            {editors.sources.length > 0
+              ? 'Bring your own editor’s theme, shortcuts and extensions into the Code tab. VS Code restarts if it is open.'
+              : 'No VS Code, Cursor, Windsurf or VSCodium setup was found on this computer.'}
+          </p>
+        </div>
+        {editors.sources.length > 0 && <EditorImport sources={editors.sources} />}
+      </section>
+    </>
   )
 }

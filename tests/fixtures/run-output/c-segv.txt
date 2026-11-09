@@ -1,0 +1,1 @@
+/bin/sh: line 1: 36827 Segmentation fault: 11  /tmp/bettercoder-run/abc/program

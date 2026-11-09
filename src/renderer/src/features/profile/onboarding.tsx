@@ -6,18 +6,31 @@ import { ProvidersSection } from '@/features/settings/settings-dialog'
 import type { SettingsState } from '@/features/settings/use-settings'
 import { cn } from '@/lib/utils'
 import { CodeViewPicker, StyleEditor } from './profile-editor'
+import { EditorImport, useEditorSources } from './editor-import'
 
 /** How an answer reads (style step preview). */
 const PREVIEW = { headline: 'Off-by-one in your loop bound', bullets: ['range(n) stops at n - 1', 'Check the last index you visit'] }
 
-const STEPS = 3
+type StepId = 'style' | 'code-view' | 'editor' | 'connect'
+
+const TITLES: Record<StepId, [string, string]> = {
+  style: ['How should your coach talk to you?', 'Pick any that fit, or say it in your own words. Optional. Your coach works out your level as you go.'],
+  'code-view': ['How should real code look?', 'Your coach writes pseudocode; the real line comes from the official docs. Pick how you want to see it.'],
+  editor: ['Bring your editor setup?', 'The Code tab is VS Code. Your theme, shortcuts and tools can come with you.'],
+  connect: ['Connect the AI your coach runs on', 'Sign in or paste a key. It stays in your computer’s keychain.']
+}
 
 /**
- * First launch: how the coach talks → how real code shows in step cards → connect a model. Their level is never asked: the coach judges it per topic
+ * First launch: how the coach talks → how real code shows in step cards → (with the built-in VS Code, when they have
+ * an editor of their own) bring its setup → connect a model. Their level is never asked: the coach judges it per topic
  * from their code and chats, and shows it in Settings › You.
  */
 export function Onboarding({ state, onDone }: { state: SettingsState; onDone: () => void }) {
+  const editors = useEditorSources()
+  const steps: StepId[] = ['style', 'code-view', ...(editors?.enabled && editors.sources.length > 0 ? (['editor'] as const) : []), 'connect']
+  const STEPS = steps.length
   const [step, setStep] = useState(0)
+  const at = steps[Math.min(step, STEPS - 1)]
   // Highlight is preselected, so finishing always saves a pick (changeable in Settings › You).
   const [draft, setDraft] = useState<LearnerProfile>(() => ({ codeView: 'highlight', ...state.settings!.profile }))
   const [saving, setSaving] = useState(false)
@@ -33,12 +46,6 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
     }
   }
 
-  const titles = ['How should your coach talk to you?', 'How should real code look?', 'Connect the AI your coach runs on']
-  const subs = [
-    'Pick any that fit, or say it in your own words. Optional. Your coach works out your level as you go.',
-    'Your coach writes pseudocode; the real line comes from the official docs. Pick how you want to see it.',
-    'Sign in or paste a key. It stays in your computer’s keychain.'
-  ]
   const preview = PREVIEW
 
   return (
@@ -53,11 +60,11 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
           </span>
         </div>
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-[26px] font-semibold tracking-tight text-heading">{titles[step]}</h1>
-          <p className="text-[14px] text-muted-foreground">{subs[step]}</p>
+          <h1 className="text-[26px] font-semibold tracking-tight text-heading">{TITLES[at][0]}</h1>
+          <p className="text-[14px] text-muted-foreground">{TITLES[at][1]}</p>
         </div>
 
-        {step === 0 && (
+        {at === 'style' && (
           <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[1.15fr_1fr]">
             <StyleEditor profile={draft} onChange={setDraft} idPrefix="onboarding" />
             <div className="flex flex-col gap-2">
@@ -84,13 +91,19 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
           </div>
         )}
 
-        {step === 1 && (
+        {at === 'code-view' && (
           <div className="w-full max-w-3xl">
             <CodeViewPicker value={draft.codeView} onChange={(codeView) => setDraft({ ...draft, codeView })} />
           </div>
         )}
 
-        {step === 2 && (
+        {at === 'editor' && editors && (
+          <div className="w-full max-w-3xl">
+            <EditorImport sources={editors.sources} />
+          </div>
+        )}
+
+        {at === 'connect' && (
           <div className="w-full max-w-xl">
             <ProvidersSection state={state} />
           </div>
@@ -111,7 +124,7 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
               {connected ? 'Finish' : 'Do this later'}
             </Button>
           )}
-          {step === 0 && (
+          {at === 'style' && (
             <Button variant="link" onClick={() => setStep(1)}>
               Skip
             </Button>

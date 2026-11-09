@@ -6,7 +6,18 @@ import { coachTurns, questionStates } from '../../../../shared/chat'
 import type { ChatItem } from './use-coach'
 import { CardView } from './cards'
 
-export function ChatView({ items, busy, onAnswer }: { items: ChatItem[]; busy: boolean; onAnswer: (text: string) => void }) {
+export function ChatView({
+  items,
+  busy,
+  onAnswer,
+  typed
+}: {
+  items: ChatItem[]
+  busy: boolean
+  onAnswer: (text: string) => void
+  /** The newest step card, and how many of its lines they have written in the editor (ticked off on the card). */
+  typed?: { id: string; n: number }
+}) {
   const end = useRef<HTMLDivElement>(null)
   useEffect(() => {
     end.current?.scrollIntoView({ block: 'end' })
@@ -30,7 +41,7 @@ export function ChatView({ items, busy, onAnswer }: { items: ChatItem[]; busy: b
       const a = answers.get(item.id)
       return (
         <CardBoundary key={`card-${item.id}`}>
-          <CardView card={item.card} answer={a?.answer} active={!!a?.open && !busy} latest={item.id === latestPseudo} onAnswer={onAnswer} />
+          <CardView card={item.card} answer={a?.answer} active={!!a?.open && !busy} latest={item.id === latestPseudo} onAnswer={onAnswer} typed={item.id === typed?.id ? typed.n : undefined} />
         </CardBoundary>
       )
     }

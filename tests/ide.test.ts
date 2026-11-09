@@ -23,13 +23,16 @@ import ghostModule from '../ide/vscode/ghost.js'
 import { track } from './helpers'
 import { realPorts } from '../src/main/ipc/ports'
 
-const { ghostAt } = ghostModule as { ghostAt: (lines: string[], anchor: number, cursor: number, ghost: string[]) => { ghost: { line: number; text: string } | null; done: boolean } }
+const { ghostAt, typedCount } = ghostModule as {
+  ghostAt: (lines: string[], anchor: number, cursor: number, ghost: string[]) => { ghost: { line: number; text: string } | null; done: boolean }
+  typedCount: (lines: string[], anchor: number, cursor: number, ghostLength: number) => number
+}
 
 const ROOT = join(import.meta.dirname, 'fixtures', 'dotnet-calculator')
 const PROJECT: ProjectInfo = { root: ROOT, name: 'MathCalculator', stacks: ['C#'], manifests: [], languages: [{ name: 'C#', files: 1 }], fileCount: 2, git: null }
 
 function snap(over: Partial<EditorSnapshot> = {}): EditorSnapshot {
-  return { ide: 'VS Code', folders: [ROOT], file: join(ROOT, 'Program.cs'), line: 2, col: 1, text: null, diagnostics: [], lastEditAt: null, errors: null, stepsDone: new Set(), ...over }
+  return { ide: 'VS Code', folders: [ROOT], file: join(ROOT, 'Program.cs'), line: 2, col: 1, text: null, diagnostics: [], lastEditAt: null, errors: null, stepsDone: new Set(), stepTyped: null, ...over }
 }
 
 test('editor messages: well-formed ones parse, anything else is dropped', () => {
@@ -134,18 +137,32 @@ test('the coach sees only project files, never secret ones, with secrets redacte
   assert.equal(editorContext(ROOT, undefined, null), '')
 })
 
-test('ghost text: one pseudocode line at a time, on the blank line they are on, done when every line is typed', () => {
-  const ghost = ['first ← ask for a number', 'second ← ask for a number']
-  const lines = ['class C', '{', '', '}']
-  assert.deepEqual(ghostAt(lines, 2, 2, ghost), { ghost: { line: 2, text: ghost[0] }, done: false })
-  assert.deepEqual(ghostAt(lines, 2, 0, ghost), { ghost: { line: 2, text: ghost[0] }, done: false }, 'before they get there, it waits on the marked line')
-  const one = ['class C', '{', 'string first = Console.ReadLine();', '', '}']
-  assert.deepEqual(ghostAt(one, 2, 3, ghost), { ghost: { line: 3, text: ghost[1] }, done: false })
-  assert.deepEqual(ghostAt(one, 2, 2, ghost).ghost, null, 'never over their own text')
-  const both = ['class C', '{', 'a', 'b', '}']
-  assert.equal(ghostAt(both, 2, 3, ghost).done, true)
-  assert.equal(ghostAt(both, 2, 3, ghost).ghost, null)
-  assert.deepEqual(ghostAt(lines, 2, 2, []), { ghost: null, done: false })
+// The extension's ghost.js (the one place the rule lives now).
+for (const [name, at] of [['extension ghost.js', ghostAt]] as const) {
+  test(`ghost text (${name}): one pseudocode line at a time, on the blank line they are on, done when every line is typed`, () => {
+    const ghost = ['first ← ask for a number', 'second ← ask for a number']
+    const lines = ['class C', '{', '', '}']
+    assert.deepEqual(at(lines, 2, 2, ghost), { ghost: { line: 2, text: ghost[0] }, done: false })
+    assert.deepEqual(at(lines, 2, 0, ghost), { ghost: { line: 2, text: ghost[0] }, done: false }, 'before they get there, it waits on the marked line')
+    const one = ['class C', '{', 'string first = Console.ReadLine();', '', '}']
+    assert.deepEqual(at(one, 2, 3, ghost), { ghost: { line: 3, text: ghost[1] }, done: false })
+    assert.deepEqual(at(one, 2, 2, ghost).ghost, null, 'never over their own text')
+    const both = ['class C', '{', 'a', 'b', '}']
+    assert.equal(at(both, 2, 3, ghost).done, true)
+    assert.equal(at(both, 2, 3, ghost).ghost, null)
+    assert.deepEqual(at(lines, 2, 2, []), { ghost: null, done: false })
+    // Far below the step, the first line waits on the (still blank) marked line.
+    const far = ['', '', '', '', '', '', '', '', '', 'x']
+    assert.deepEqual(at(far, 0, 9, ghost), { ghost: { line: 0, text: ghost[0] }, done: false })
+  })
+}
+
+test('typed lines count up as they write under the marked line, capped at the step length', () => {
+  const lines = ['class C', '{', 'a', '', 'b', 'c', '}']
+  assert.equal(typedCount(lines, 2, 1, 2), 0, 'not there yet')
+  assert.equal(typedCount(lines, 2, 3, 2), 1)
+  assert.equal(typedCount(lines, 2, 5, 2), 2)
+  assert.equal(typedCount(lines, 2, 5, 0), 0)
 })
 
 test('a step card can mark a line in their file, inside the project only; an idea has no place to mark', async () => {
@@ -234,15 +251,50 @@ test('the hub sends the editor an absolute marker and a status line, and tells t
   assert.ok(hub.view().otherFolder, 'with no project open, the panel can offer the editor folder')
 })
 
-test('open in editor: the linked editor’s link, paths encoded, notebook-safe lines', async () => {
-  const { editorUrl, editorScheme } = await import('../src/main/core/editor-url')
-  assert.equal(editorScheme(null), 'vscode')
-  assert.equal(editorScheme('Cursor'), 'cursor')
-  assert.equal(editorScheme('Windsurf'), 'windsurf')
-  assert.equal(editorScheme('VSCodium'), 'vscodium')
-  assert.equal(editorScheme('Visual Studio Code - Insiders'), 'vscode-insiders')
-  assert.equal(editorScheme('Visual Studio Code'), 'vscode')
-  assert.equal(editorUrl('Cursor', '/Users/me/calc/main.py', 12), 'cursor://file/Users/me/calc/main.py:12')
-  assert.equal(editorUrl(null, '/Users/me/My Calc/a#1?.py'), 'vscode://file/Users/me/My%20Calc/a%231%3F.py')
-  assert.equal(editorUrl(null, '/Users/me/calc', 0), 'vscode://file/Users/me/calc')
+test('open in editor: the request waits for VS Code to connect, then opens the file at the line', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'bc-open-'))
+  const path = join(dir, 'ide.sock')
+  let now = 1000
+  const bridge = new IdeBridge(() => undefined, () => now)
+  await bridge.listen(path)
+  try {
+    const file = join(ROOT, 'Program.cs')
+    bridge.send({ type: 'open', file, line: 12 }) // the Code tab is only now opening VS Code
+    const a = await connect(path)
+    await tick()
+    assert.deepEqual(a.received.at(-1), { type: 'open', file, line: 12 })
+    // Once delivered, it is not sent again to the next window.
+    const b = await connect(path)
+    await tick()
+    assert.ok(!b.received.some((m) => m.type === 'open'))
+    // Connected: sent at once. A request older than a minute is dropped.
+    bridge.send({ type: 'open', file, line: 3 })
+    await tick()
+    assert.deepEqual(a.received.at(-1), { type: 'open', file, line: 3 })
+    a.socket.destroy()
+    b.socket.destroy()
+    await tick()
+    bridge.send({ type: 'open', file, line: 4 })
+    now += 61_000
+    const c = await connect(path)
+    await tick()
+    assert.ok(!c.received.some((m) => m.type === 'open'))
+    c.socket.destroy()
+  } finally {
+    await bridge.close()
+  }
+})
+
+test('lines typed: VS Code reports them for the marked step, and the panel shows them for that step only', () => {
+  let view: IdeView | null = null
+  const s = snap({ stepTyped: { stepId: 'card-7', n: 2 } })
+  const feed = { snapshot: () => s, send: () => undefined }
+  const hub = new IdeHub(feed, (v) => (view = v))
+  hub.setSession({ root: ROOT }, [], { id: 'card-7', path: 'Program.cs', line: 2, ghost: ['a', 'b', 'c'] } as AnchoredStep)
+  assert.equal(hub.view().typed, 2)
+  hub.setStep({ id: 'card-8', path: 'Program.cs', line: 2, ghost: ['a'] } as AnchoredStep)
+  assert.equal(hub.view().typed, 0, 'counts for another step do not carry over')
+  assert.ok(view)
+  assert.deepEqual(parseIdeMessage(JSON.stringify({ type: 'step_typed', stepId: 'card-8', n: 1 })), { type: 'step_typed', stepId: 'card-8', n: 1 })
+  assert.equal(parseIdeMessage(JSON.stringify({ type: 'step_typed', stepId: 'card-8' })), null)
 })

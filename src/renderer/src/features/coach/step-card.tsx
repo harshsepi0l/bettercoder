@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { BookOpen, ExternalLink, Footprints, MapPin } from 'lucide-react'
+import { BookOpen, Check, ExternalLink, Footprints, MapPin } from 'lucide-react'
 import type { Card, StepLine } from '../../../../shared/cards'
 import { splitLine, type LineSegment } from '../../../../shared/line-parts'
 import type { CodeView } from '../../../../shared/profile'
@@ -24,12 +24,15 @@ export function StepCard({
   card,
   answer,
   active,
-  onAnswer
+  onAnswer,
+  typed = 0
 }: {
   card: StepCardData
   answer?: string
   active: boolean
   onAnswer: (text: string) => void
+  /** How many pseudocode lines they have written in their editor so far (shown as done). */
+  typed?: number
 }) {
   // Picked in onboarding or Settings › You, never inside a session; Highlight until they pick.
   const shown: CodeView = useCodeView().view ?? 'highlight'
@@ -54,7 +57,7 @@ export function StepCard({
 
       {card.idea && <Idea idea={card.idea} showExample={!hasLinks} />}
 
-      {card.lines.length > 0 && (shown === 'stepper' ? <Stepper lines={card.lines} /> : <Highlight lines={card.lines} />)}
+      {card.lines.length > 0 && (shown === 'stepper' ? <Stepper lines={card.lines} typed={typed} /> : <Highlight lines={card.lines} typed={typed} />)}
 
       {card.question && (
         <div className="border-t pt-3">
@@ -176,7 +179,7 @@ function PartLabel({ segment }: { segment: LineSegment }) {
 }
 
 /** C: every line visible; pick one to see its official example, with the matching line lit. */
-function Highlight({ lines }: { lines: StepLine[] }) {
+function Highlight({ lines, typed = 0 }: { lines: StepLine[]; typed?: number }) {
   const [sel, setSel] = useState(() => Math.max(0, lines.findIndex(linked)))
   const current = lines[sel]
   return (
@@ -194,7 +197,10 @@ function Highlight({ lines }: { lines: StepLine[] }) {
                 i === sel ? 'border-brand-line bg-brand-text/10' : 'hover:bg-accent/50'
               )}
             >
-              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{l.text.trim()}</span>
+              {i < typed && <Check className="size-3 shrink-0 text-status-done" aria-label="written" />}
+              <span className={cn('min-w-0 flex-1 whitespace-pre-wrap break-words', i < typed && 'text-muted-foreground line-through decoration-status-done/60')}>
+                {l.text.trim()}
+              </span>
               {linked(l) && (
                 <span className="shrink-0 rounded-full border px-2 font-mono text-[10.5px] text-brand-text">{l.method!.split('.').pop()}</span>
               )}
@@ -213,7 +219,7 @@ function Highlight({ lines }: { lines: StepLine[] }) {
 }
 
 /** D: one line at a time, with its official line and a note. */
-function Stepper({ lines }: { lines: StepLine[] }) {
+function Stepper({ lines, typed = 0 }: { lines: StepLine[]; typed?: number }) {
   const [at, setAt] = useState(0)
   const line = lines[at]
   const depth = depthOf(line.text)
@@ -222,7 +228,7 @@ function Stepper({ lines }: { lines: StepLine[] }) {
       <div className="flex items-center gap-2">
         <div className="flex flex-1 gap-1" aria-hidden="true">
           {lines.map((_, i) => (
-            <span key={i} className={cn('h-[3px] flex-1 rounded-full', i <= at ? 'bg-brand-line' : 'bg-border')} />
+            <span key={i} className={cn('h-[3px] flex-1 rounded-full', i < typed ? 'bg-status-done' : i <= at ? 'bg-brand-line' : 'bg-border')} />
           ))}
         </div>
         <span className="font-mono text-[10.5px] text-muted-foreground">

@@ -1,0 +1,4 @@
+undef.c:3:16: error: use of undeclared identifier 'total'
+    3 |   printf("%d", total);
+      |                ^~~~~
+1 error generated.

@@ -11,6 +11,8 @@ import { DEFAULT_PROFILE, type LearnerProfile } from '../src/shared/profile'
 import type { ProjectInfo } from '../src/shared/ipc'
 import { track } from './helpers'
 import { realPorts } from '../src/main/ipc/ports'
+import { runView } from '../src/main/core/run-view'
+import type { RunSummary } from '../src/shared/code'
 
 const ROOT = join(import.meta.dirname, 'fixtures', 'dotnet-calculator')
 const PROJECT: ProjectInfo = { root: ROOT, name: 'calc', stacks: ['C#'], manifests: [], languages: [{ name: 'C#', files: 1 }], fileCount: 1, git: null }
@@ -117,4 +119,67 @@ test('cache: the xAI request keeps its start byte-for-byte as skills, card use a
   const last = JSON.stringify(input.findLast((m) => (m as { role?: string }).role === 'user'))
   assert.match(last, /learner now/, 'levels and card use ride on the newest message')
   assert.match(last, /parsing/)
+})
+
+/**
+ * The learner's last ▶ Run reaches the coach the same way as the editor view: on the newest message only. A new run
+ * between messages must not change anything before the previous learner message, and no run view is ever stored.
+ */
+test('cache: a new run changes only the newest message, and no run view is stored', async () => {
+  const faux = fauxProvider()
+  const models = createModels()
+  models.setProvider(faux.provider)
+  const contexts: unknown[] = []
+  const opts: Array<{ sessionId?: string } | undefined> = []
+  let run: RunSummary | null = null
+  const dir = await mkdtemp(join(tmpdir(), 'bc-cache-run-'))
+  const file = join(dir, 's.sqlite')
+  const coach = track(
+    await Coach.open(file, PROJECT, () => undefined, {
+      ports: realPorts(),
+      models,
+      resolveModel: async () => faux.getModel(),
+      editorContext: () => runView(run, 10_000)
+    })
+  )
+  const reply = (text: string) => (ctx: unknown, o: unknown) => (
+    contexts.push(structuredClone(ctx)), opts.push(o as never), fauxAssistantMessage([fauxText(text)], { stopReason: 'stop' })
+  )
+  faux.setResponses([reply('**Run it**'), reply('**Line 10 uses b too early**'), reply('**Works now**')])
+  const crash = (at: number): RunSummary => ({
+    id: 't1', path: 'main.py', startedAt: at, endedAt: at + 100, exitCode: 1, stopped: false,
+    output: "First number: 7\nTraceback (most recent call last):\n  File \"main.py\", line 10, in <module>\nNameError: name 'b' is not defined\n",
+    error: { type: 'NameError', message: "name 'b' is not defined", path: 'main.py', line: 10 }, words: 'Line 10 uses b before it exists.'
+  })
+  await coach.send('how do I run it?')
+  await coach.waitForIdle()
+  run = crash(1000)
+  await coach.send('why did it crash?')
+  await coach.waitForIdle()
+  run = { ...crash(5000), exitCode: 0, output: 'First number: 7\nSecond number: 5\n12\n', error: null, words: null }
+  await coach.send('fixed it')
+  await coach.waitForIdle()
+
+  const bodies = await Promise.all(contexts.map((c, i) => xaiBody(c, opts[i]?.sessionId)))
+  assert.equal(bodies.length, 3)
+  const userText = (b: Body) => JSON.stringify(b.input.findLast((m) => (m as { role?: string }).role === 'user'))
+  assert.doesNotMatch(userText(bodies[0]), /last run/, 'no run yet, no run view')
+  assert.match(userText(bodies[1]), /BetterCoder last run[\s\S]*NameError on line 10 of main\.py/, 'the crash rides on the newest message')
+  assert.match(userText(bodies[2]), /exit status 0/)
+  for (let i = 1; i < bodies.length; i++) {
+    const prev = bodies[i - 1]
+    const lastUser = prev.input.findLastIndex((m) => (m as { role?: string }).role === 'user')
+    for (let k = 0; k < lastUser; k++) assert.deepEqual(bodies[i].input[k], prev.input[k], `request ${i + 1}: item ${k} changed`)
+    // The older crash is not carried along in earlier messages.
+    assert.doesNotMatch(JSON.stringify(bodies[i].input.slice(0, lastUser + 1)), /NameError on line 10/, `request ${i + 1}: an old run view stayed in the history`)
+  }
+  await coach.close()
+  const { readFile, readdir } = await import('node:fs/promises')
+  for (const name of await readdir(dir)) {
+    const bytes = await readFile(join(dir, name))
+    // (The prompt itself names the "[BetterCoder last run: …]" view, so look for what only a real view holds.)
+    for (const marker of ['End of last run.]', 'NameError on line 10 of main.py', 'Second number: 5']) {
+      assert.ok(!bytes.includes(marker), `${name} stores a run view (${marker})`)
+    }
+  }
 })

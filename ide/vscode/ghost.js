@@ -13,6 +13,17 @@
  * @param {string[]} ghost  the step's pseudocode lines
  * @returns {{ ghost: { line: number, text: string } | null, done: boolean }}
  */
+/**
+ * How many pseudocode lines they have typed so far (0..ghostLength): non-blank lines from the marked line to the cursor.
+ * @returns {number}
+ */
+function typedCount(lines, anchor, cursor, ghostLength) {
+  if (ghostLength === 0 || anchor < 0 || cursor < anchor) return 0
+  let n = 0
+  for (let i = anchor; i <= cursor && i < lines.length; i++) if (lines[i].trim() !== '') n++
+  return Math.min(n, ghostLength)
+}
+
 function ghostAt(lines, anchor, cursor, ghost) {
   const blank = (i) => i < 0 || i >= lines.length || lines[i].trim() === ''
   if (ghost.length === 0 || anchor < 0) return { ghost: null, done: false }
@@ -31,4 +42,4 @@ function ghostAt(lines, anchor, cursor, ghost) {
   return { ghost: null, done }
 }
 
-module.exports = { ghostAt }
+module.exports = { ghostAt, typedCount }

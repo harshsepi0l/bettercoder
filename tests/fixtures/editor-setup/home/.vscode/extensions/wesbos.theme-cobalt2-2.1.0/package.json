@@ -1,0 +1,1 @@
+{"name":"theme-cobalt2","publisher":"wesbos","categories":["Themes"],"contributes":{"themes":[{"label":"Cobalt2","uiTheme":"vs-dark","path":"./theme.json"}]}}

@@ -16,7 +16,8 @@ export function CardView({
   answer,
   active,
   latest,
-  onAnswer
+  onAnswer,
+  typed
 }: {
   card: Card
   /** For questions: what the learner answered, if they did. */
@@ -25,6 +26,8 @@ export function CardView({
   active?: boolean
   /** For pseudocode: the newest one starts hidden, line by line; older ones open in full. */
   latest?: boolean
+  /** For a step: how many of its pseudocode lines they have written (shown as done). */
+  typed?: number
   onAnswer: (text: string) => void
 }) {
   switch (card.kind) {
@@ -41,7 +44,7 @@ export function CardView({
     case 'pseudocode':
       return <PseudocodeCard card={card} revealAll={!latest} />
     case 'step':
-      return <StepCard card={card} answer={answer} active={!!active} onAnswer={onAnswer} />
+      return <StepCard card={card} answer={answer} active={!!active} onAnswer={onAnswer} typed={typed} />
     case 'animation':
       return <AnimationCard card={card} />
   }

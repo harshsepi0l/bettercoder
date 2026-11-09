@@ -7,21 +7,21 @@
 <p align="center"><b>Pseudocode, pictures and your own code running. Never the answer.</b></p>
 
 <p align="center">
-  A desktop coach that sits beside your editor and teaches you to build it yourself.
+  A desktop coach you write your code in. It teaches you to build it yourself.
 </p>
 
 <p align="center">
-  <img src="docs/images/hero.png" alt="BetterCoder coaching a C# calculator: progress and feeling meters, then one step card with the idea, two pseudocode lines and the official Console.ReadLine example">
+  <img src="docs/images/hero.png" alt="BetterCoder with a C# calculator open: the built-in editor with line 8 written and the next pseudocode line faded on line 9, a terminal below, and the coach pane on the right with the current step and its first line ticked off">
 </p>
 
 ## What it does
 
+- **One window to work in.** Real VS Code in the Code tab (open source, extensions from Open VSX), with your own VS Code or Cursor setup brought over, and the coach beside your code.
 - **Coaches one step at a time.** Each step is one card: the idea, the pseudocode, and the real line from the official docs.
 - **Never writes your code.** Every reply and card is checked before you see it; real code is sent back to be redone.
-- **Runs your code and shows it.** Your Python runs on a sandboxed copy, and you step through it: the line, the variables, lists and objects drawn as boxes.
+- **Runs your code and shows it.** ▶ Run works for Python, notebooks, JavaScript/TypeScript, C#, Java, Kotlin, Swift, C and C++: the real output, the failing line underlined, and one line in plain words. The animator runs your Python on a sandboxed copy so you can step through it: the line, the variables, lists and objects drawn as boxes.
 - **Shows ideas in motion.** For "how does serializing work?", the coach runs a small hidden example and you watch the values change.
 - **Maps your project.** Files, classes and functions for Python, TypeScript/JavaScript, Java, C#, Kotlin, Swift and C++.
-- **Works with your editor.** VS Code, Cursor or Windsurf: it marks the line to write next and shows the pseudocode faded beside it, never typed in.
 
 ## Who it's for
 
@@ -72,24 +72,22 @@ Ideas get a hidden example: you see the values and a numbered story, never the c
   </tr>
 </table>
 
-### Beside your editor
+### Write it here
 
-BetterCoder marks the line to write next in VS Code and shows the step's pseudocode faded beside it, one line at a time as you type. It is a decoration, so Tab never writes it into your file. When the step is typed out, the coach offers the next one.
+The Code tab is VS Code: formatting, linting, notebooks and debugging, with your own theme, shortcuts and extensions brought over from VS Code, Cursor, Windsurf or VSCodium (from Open VSX; Microsoft-only ones are swapped for open equivalents). AI extensions are never installed, and autocomplete offers names only. The coach marks the line to write next and shows the step's pseudocode faded there, one line at a time; it is never part of your file. ▶ Run (⌘Enter) runs your file for real in your project, so `input()` works and files it saves stay; a missing compiler comes with its official install page. The coach only ever sees your last Run's output, and never types in a terminal.
 
-<p align="center"><img src="docs/images/editor.gif" alt="VS Code on the left, BetterCoder on the right: line 8 is marked with faded pseudocode, the learner types each line, the next pseudocode line appears, then BetterCoder shows Next step"></p>
-
-Make the window narrow and it fits next to your editor. Projects become blocks; tap one for its sessions.
+Make the window narrow and the coach becomes a tab. Projects become blocks; tap one for its sessions.
 
 <p align="center"><img src="docs/images/narrow.png" width="320" alt="BetterCoder in a narrow window, a project's sessions open in a list"></p>
 
 ## Get started
 
-You need macOS (the animator uses the macOS sandbox), Node 24, and Python 3 for animations.
+You need macOS (the animator uses the macOS sandbox), Node 24, and Python 3 for animations. ▶ Run uses whatever you have installed for each language.
 
 ```bash
 npm install
-npm run dev        # run the app
-npm run ide:link   # link the editor extension into VS Code, Cursor or Windsurf, then restart the editor
+npm run vscode:fetch   # downloads the Code tab's VS Code (code-server, MIT), checked against its published checksum
+npm run dev            # run the app
 ```
 
 Then connect a model in **Settings**. BetterCoder works with 42 providers through [pi-ai](https://github.com/earendil-works/pi) (Grok, Claude, GPT and more), using your own API key. Keys are stored in your OS keychain and never leave the app's main process.
@@ -97,7 +95,7 @@ Then connect a model in **Settings**. BetterCoder works with 42 providers throug
 ## The rules it keeps
 
 - **No code for you, ever.** One mode, no switch. Pseudocode in step cards is checked to be language-neutral.
-- **Your project is read-only.** No path escapes, secret files are refused, secrets are blanked out.
+- **You write, the coach never does.** Only you write, in the Code tab's VS Code; the app itself writes nothing into your project. The coach only reads: no path escapes, secret files are refused, secrets are blanked out. Its runs (the animator, examples) happen on a sandboxed copy.
 - **What you type is never word-matched.** Buttons send structured intents; your words go to the model as they are.
 - **Sessions never break.** State is rebuilt from the saved conversation, so a restart picks up where you were.
 

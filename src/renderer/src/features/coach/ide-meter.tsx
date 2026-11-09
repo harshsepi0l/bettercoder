@@ -111,3 +111,59 @@ export function IdeMeter({ busy, onSend }: { busy: boolean; onSend: (text: strin
     </section>
   )
 }
+
+const MOOD_TEXT: Record<Mood, string> = { stuck: 'text-status-missing', ok: 'text-status-progress', flowing: 'text-status-done' }
+
+/**
+ * The same two meters in one slim row, for the coach pane beside the editor: progress as small segments (task names
+ * on hover, no second "Now:" name: the step card holds the one name) and the feeling as a word. Hint and Next step
+ * buttons appear as they do in the full meters.
+ */
+export function IdeMeterRow({ busy, onSend }: { busy: boolean; onSend: (text: string, intent?: CoachIntent) => void }) {
+  const ide = useIde()
+  if (!ide.linked && ide.tasks.length === 0) return null
+  const done = ide.tasks.filter((t) => t.percent >= 100).length
+  return (
+    <section aria-label="Progress" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-divider bg-chrome px-3 py-2">
+      {ide.tasks.length > 0 && (
+        <div className="flex items-center gap-1.5" title={ide.tasks.map((t) => `${t.title}: ${t.percent}%`).join('\n')}>
+          <div className="flex gap-0.5" aria-hidden="true">
+            {ide.tasks.map((t, i) => (
+              <div key={i} className="h-1.5 w-5 overflow-hidden rounded-full bg-divider">
+                <div className="h-1.5 bg-brand-line" style={{ width: `${t.percent}%` }} />
+              </div>
+            ))}
+          </div>
+          <span className="font-mono text-[10.5px] text-muted-foreground">
+            {done}/{ide.tasks.length}
+          </span>
+        </div>
+      )}
+      {ide.mood && (
+        <span className="text-[11.5px]" title={ide.why}>
+          <span className={cn('font-semibold', MOOD_TEXT[ide.mood])}>{ZONES.find((z) => z.mood === ide.mood)?.label}</span>
+          <span className="text-muted-foreground"> · {ide.why}</span>
+        </span>
+      )}
+      <span className="flex-1" />
+      {ide.otherFolder && (
+        <Button size="xs" variant="outline" className="h-6" onClick={() => void window.ide.openFolder()}>
+          <FolderOpen />
+          Open {ide.otherFolder.split('/').pop()}
+        </Button>
+      )}
+      {!busy && ide.mood === 'stuck' && (
+        <Button size="xs" className="h-6" onClick={() => onSend("I'm stuck. Help me work out what's going on, without giving me the answer.", 'stuck')}>
+          <LifeBuoy />
+          Get a hint
+        </Button>
+      )}
+      {!busy && ide.stepDone && ide.mood !== 'stuck' && (
+        <Button size="xs" className="h-6" onClick={() => onSend('I wrote that step. What next?', 'next')}>
+          <ArrowRight />
+          Next step
+        </Button>
+      )}
+    </section>
+  )
+}

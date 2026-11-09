@@ -1,0 +1,20 @@
+{
+  // My look
+  "workbench.colorTheme": "Cobalt2",
+  "editor.fontFamily": "'JetBrains Mono', Menlo, monospace",
+  "editor.fontSize": 14,
+  "editor.tabSize": 4,
+  "editor.formatOnSave": true,
+  /* AI and things BetterCoder manages */
+  "github.copilot.enable": { "*": true },
+  "editor.inlineSuggest.enabled": true,
+  "chat.agent.enabled": true,
+  "claude-code.selectedModel": "opus",
+  "extensions.autoUpdate": true,
+  "telemetry.telemetryLevel": "all",
+  "gitlens.apiToken": "abc123",
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.inlineSuggest.enabled": true,
+  },
+}

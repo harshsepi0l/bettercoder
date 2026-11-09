@@ -6,7 +6,9 @@ import { PanelTabs } from '@/features/shell/panel-tabs'
 import { Sidebar, SidebarRail, type SidebarProps } from '@/features/shell/sidebar'
 import { SessionBar } from '@/features/shell/session-bar'
 import { Composer } from '@/features/shell/composer'
-import { SectionContent, type SectionId } from '@/features/shell/sections'
+import { SectionContent, layoutSections, type SectionId } from '@/features/shell/sections'
+import { CoachSplit } from '@/features/shell/coach-aside'
+import { CoachPane } from '@/features/coach/coach-pane'
 import { useIsWide } from '@/features/shell/use-is-wide'
 import { useCoach } from '@/features/coach/use-coach'
 import { SettingsDialog } from '@/features/settings/settings-dialog'
@@ -27,7 +29,7 @@ function readSidebarOpen(): boolean {
 }
 
 export function App() {
-  const [section, setSection] = useState<SectionId>('coach')
+  const [section, setSection] = useState<SectionId>('code')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [atHome, setAtHome] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
@@ -53,16 +55,32 @@ export function App() {
 
   // Opening or starting a session leaves Home; an idea project starts on the Coach tab.
   useEffect(() => {
-    if (sessionId) setAtHome(false)
+    if (!sessionId) return
+    setAtHome(false)
+    // A session opens on the code; an idea with no folder (in a narrow window) on the coach.
+    setSection(isIdea && !wide ? 'coach' : 'code')
+    // Only when the session changes.
   }, [sessionId])
   // A locked tab (Map in an idea; Visualize until it has an animation) falls back to Coach. Same rule as the tab row
   // (regression: this sent every idea back to Coach, so an unlocked Visualize tab still would not open).
   const locked = useMemo(() => lockedSections(isIdea, coach.items), [isIdea, coach.items])
-  const shownSection: SectionId = (locked as SectionId[]).includes(section) ? 'coach' : section
+  // Wide: the coach is a pane beside the Code tab's VS Code.
+  const paneLayout = wide
+  const shown = layoutSections({ wide })
+  const shownSection: SectionId = (locked as SectionId[]).includes(section) || !shown.includes(section) ? shown[0] : section
   // Also reset what is stored, so a tab that unlocks later (an animation arrives) never jumps open by itself.
   useEffect(() => {
     if (shownSection !== section) setSection(shownSection)
   }, [shownSection, section])
+
+  // "Open in editor" (Map, a step card's file link) opens the file in VS Code: bring the Code tab to the front.
+  useEffect(() => {
+    const off = window.ide.onShowCode(() => {
+      setAtHome(false)
+      setSection('code')
+    })
+    return off
+  }, [])
 
   function toggleSidebar() {
     setSidebarOpen((open) => {
@@ -102,6 +120,39 @@ export function App() {
 
   const disabledReason = !project ? 'Open a folder or files first' : !hasModel ? 'Connect a model in Settings to start' : null
 
+  const composer = (
+    <Composer
+      wide={wide}
+      disabledReason={disabledReason}
+      busy={coach.busy}
+      usage={coach.usage}
+      hasCode={!isIdea}
+      onSend={coach.send}
+      onStop={coach.stop}
+    />
+  )
+  const tabs = (
+    <PanelTabs section={shownSection} onSectionChange={setSection} disabled={locked} shown={shown}>
+      <SectionContent
+        section={shownSection}
+        sessionKey={sessionId ?? ''}
+        project={project}
+        onOpenProject={() => workspace.open()}
+        onPickFolder={() => {
+          if (workspace.active) void workspace.linkFolder(workspace.active.project.id)
+        }}
+        coach={coach}
+        hasModel={hasModel}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onAsk={(text, intent) => {
+          // Beside the editor the coach is already on screen; otherwise switch to it.
+          if (!paneLayout) setSection('coach')
+          coach.send(text, intent)
+        }}
+      />
+    </PanelTabs>
+  )
+
   // How step cards show real code: the learner's pick from onboarding or Settings, saved with their profile.
   const codeView = { view: settings?.profile.codeView }
 
@@ -138,30 +189,27 @@ export function App() {
             ) : (
               <>
                 <SessionBar workspace={workspace} wide={wide} />
-                <PanelTabs section={shownSection} onSectionChange={setSection} disabled={locked}>
-                  <SectionContent
-                    section={shownSection}
-                    project={project}
-                    onOpenProject={() => workspace.open()}
-                    coach={coach}
-                    hasModel={hasModel}
-                    onOpenSettings={() => setSettingsOpen(true)}
-                    onAsk={(text, intent) => {
-                      setSection('coach')
-                      coach.send(text, intent)
-                    }}
+                {paneLayout ? (
+                  // The learner's work on the left, the coach always on the right (resizable).
+                  <CoachSplit
+                    work={tabs}
+                    coach={
+                      <CoachPane
+                        project={project}
+                        coach={coach}
+                        hasModel={hasModel}
+                        onOpenProject={() => workspace.open()}
+                        onOpenSettings={() => setSettingsOpen(true)}
+                      >
+                        {composer}
+                      </CoachPane>
+                    }
                   />
-                </PanelTabs>
-                {shownSection === 'coach' && (
-                  <Composer
-                    wide={wide}
-                    disabledReason={disabledReason}
-                    busy={coach.busy}
-                    usage={coach.usage}
-                    hasCode={!isIdea}
-                    onSend={coach.send}
-                    onStop={coach.stop}
-                  />
+                ) : (
+                  <>
+                    {tabs}
+                    {shownSection === 'coach' && composer}
+                  </>
                 )}
               </>
             )}

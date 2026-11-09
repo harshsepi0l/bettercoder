@@ -1,0 +1,79 @@
+[
+ {
+  "identifier": {
+   "id": "bettercoder.bettercoder-ide"
+  },
+  "version": "x",
+  "relativeLocation": "bettercoder.bettercoder-ide-0.1.0"
+ },
+ {
+  "identifier": {
+   "id": "github.copilot"
+  },
+  "version": "x",
+  "relativeLocation": "github.copilot-1.300.0"
+ },
+ {
+  "identifier": {
+   "id": "ms-dotnettools.csdevkit"
+  },
+  "version": "x",
+  "relativeLocation": "ms-dotnettools.csdevkit-1.0.0"
+ },
+ {
+  "identifier": {
+   "id": "ms-dotnettools.csharp"
+  },
+  "version": "x",
+  "relativeLocation": "ms-dotnettools.csharp-2.0.0"
+ },
+ {
+  "identifier": {
+   "id": "ms-python.python"
+  },
+  "version": "x",
+  "relativeLocation": "ms-python.python-2026.4.0-universal"
+ },
+ {
+  "identifier": {
+   "id": "ms-python.vscode-pylance"
+  },
+  "version": "x",
+  "relativeLocation": "ms-python.vscode-pylance-2026.1.0"
+ },
+ {
+  "identifier": {
+   "id": "ms-vscode-remote.remote-ssh"
+  },
+  "version": "x",
+  "relativeLocation": "ms-vscode-remote.remote-ssh-0.110.0"
+ },
+ {
+  "identifier": {
+   "id": "old.removed"
+  },
+  "version": "x",
+  "relativeLocation": "old.removed-1.0.0"
+ },
+ {
+  "identifier": {
+   "id": "private.only-mine"
+  },
+  "version": "x",
+  "relativeLocation": "private.only-mine-1.0.0"
+ },
+ {
+  "identifier": {
+   "id": "someone.chat-buddy"
+  },
+  "version": "x",
+  "relativeLocation": "someone.chat-buddy-0.1.0"
+ },
+ {
+  "identifier": {
+   "id": "wesbos.theme-cobalt2"
+  },
+  "version": "x",
+  "relativeLocation": "wesbos.theme-cobalt2-2.1.0"
+ }
+]

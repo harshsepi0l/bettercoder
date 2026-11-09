@@ -1,0 +1,4 @@
+{
+  // my main block
+  "main": { "prefix": "ifmain", "body": ["if __name__ == \"__main__\":", "    $0"] }
+}

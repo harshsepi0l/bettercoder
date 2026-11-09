@@ -4,6 +4,8 @@ import type { WorkspaceApi } from '../shared/workspace'
 import type { VisualizeApi } from '../shared/visualize'
 import type { MapApi } from '../shared/map'
 import type { IdeApi } from '../shared/ide'
+import type { CodeApi } from '../shared/code'
+import type { EditorImportApi } from '../shared/editor-import'
 
 declare global {
   interface Window {
@@ -13,5 +15,7 @@ declare global {
     visualize: VisualizeApi
     codeMap: MapApi
     ide: IdeApi
+    code: CodeApi
+    editorImport: EditorImportApi
   }
 }
