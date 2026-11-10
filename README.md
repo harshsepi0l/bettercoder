@@ -74,7 +74,21 @@ Ideas get a hidden example: you see the values and a numbered story, never the c
 
 ### Write it here
 
-The Code tab is VS Code: formatting, linting, notebooks and debugging, with your own theme, shortcuts and extensions brought over from VS Code, Cursor, Windsurf or VSCodium (from Open VSX; Microsoft-only ones are swapped for open equivalents). AI extensions are never installed, and autocomplete offers names only. The coach marks the line to write next and shows the step's pseudocode faded there, one line at a time; it is never part of your file. ▶ Run (⌘Enter) runs your file for real in your project, so `input()` works and files it saves stay; a missing compiler comes with its official install page. The coach only ever sees your last Run's output, and never types in a terminal.
+The Code tab is VS Code: formatting, linting, notebooks and debugging. AI extensions are never installed, and autocomplete offers names only. The coach marks the line to write next and shows the step's pseudocode faded there, one line at a time; it is never part of your file. Drag the coach's edge to make it wider or narrower.
+
+### Run any language
+
+▶ Run (⌘Enter) runs your file for real in your project, so `input()` works and files it saves stay: Python, JavaScript/TypeScript, C#, Java, Kotlin, Swift, C and C++ (notebooks use Run All). The output shows word for word, the failing line is underlined, and one line says what went wrong in plain words. A missing compiler comes with its official install page. The coach only ever sees your last Run's output, and never types in a terminal.
+
+<p align="center"><img src="docs/images/run.png" alt="A Python file run with Run: the traceback in VS Code's Run terminal, then 'In words: Line 8 uses count before it exists', line 8 underlined, and the coach showing Working on an error"></p>
+
+### Bring your VS Code
+
+Your theme, font, shortcuts, snippets and extensions come over from VS Code, Cursor, Windsurf or VSCodium, during setup or later in Settings › Editor. Extensions come from Open VSX; Microsoft-only ones are swapped for open equivalents. AI extensions and AI settings are always left out.
+
+<p align="center"><img src="docs/images/bring-your-vscode.png" width="620" alt="Settings, Editor: VS Code found with 10 extensions. Comes with you: theme, font, settings, shortcuts, extensions; C# Dev Kit and Pylance swapped for open ones. Left out: Copilot and another AI extension, 8 settings, remote SSH"></p>
+
+### Small windows
 
 Make the window narrow and the coach becomes a tab. Projects become blocks; tap one for its sessions.
 
