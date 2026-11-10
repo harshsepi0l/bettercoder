@@ -1,23 +1,34 @@
 'use strict'
 
 /**
- * BetterCoder for VS Code (and Cursor, Windsurf, VSCodium).
+ * BetterCoder inside the Code tab's built-in VS Code. (Installed anywhere else, it does nothing.)
  *
- * Tells the BetterCoder app which file is open, where the cursor is, the text and the problems. Shows what the app
- * sends back: a marker on the line where the step goes, the step's pseudocode faded beside the cursor, one line at a
- * time, and a status line. Decorations only: nothing is ever written into the learner's files, and Tab never
- * accepts anything.
+ * Tells the BetterCoder app which file is open, where the cursor is, the text and the problems. Notebooks are
+ * reported in the coach's own view of them (notebook-view.js): a header per cell, its source and short outputs, with
+ * the same line numbers the coach's tools use. Shows what the app sends back: a marker on the line where the step
+ * goes (in a notebook, on the right cell), the step's pseudocode faded beside the cursor, one line at a time, and a
+ * status line. Decorations only: nothing is ever written into the learner's files, and Tab never accepts anything.
+ *
+ * ▶ Run (the learner's button, in the editor's title bar): the app runs the file in its own terminal, so the coach
+ * sees the last run and errors get their plain-words line; it streams back into a "▶ Run" terminal here, which takes
+ * the learner's keystrokes (input() works). The run's error is underlined on its line.
  */
 
 const vscode = require('vscode')
 const net = require('net')
 const os = require('os')
 const path = require('path')
-const { ghostAt } = require('./ghost')
+const { ghostAt, typedCount } = require('./ghost')
+const { notebookView, cellAt } = require('./notebook-view')
+const { isAiExtension } = require('./ai-block')
 
 const SOCKET = path.join(os.homedir(), '.bettercoder', 'ide.sock')
 const MAX_TEXT = 300000
 const RETRY_MS = 3000
+const PINK = '\x1b[38;2;241;162;171m'
+const DIM = '\x1b[2m'
+const RED = '\x1b[38;2;251;113;133m'
+const RESET = '\x1b[0m'
 
 let socket = null
 let buffer = ''
@@ -26,10 +37,16 @@ let disposed = false
 /** @type {{ stepId: string, file: string, line: number, ghost: string[] } | null} */
 let anchor = null
 let doneSent = null
+/** The last lines-typed count sent, as "stepId:n". */
+let typedSent = null
 let status
 let markerType
 let ghostType
+let runProblems
+/** The "▶ Run" terminal of the latest run: { id, file, done, terminal, write }. */
+let runTerm = null
 const timers = new Map()
+const decoder = new TextDecoder()
 
 function debounce(key, ms, fn) {
   clearTimeout(timers.get(key))
@@ -44,9 +61,67 @@ function send(message) {
   if (socket && !socket.destroyed && socket.writable) socket.write(JSON.stringify(message) + '\n')
 }
 
-function fileEditor() {
+// ── Where the learner is: a file, or a cell of a notebook ──
+
+function notebookOfCell(doc) {
+  for (const nb of vscode.workspace.notebookDocuments) {
+    const index = nb.getCells().findIndex((c) => c.document === doc)
+    if (index >= 0) return { nb, index }
+  }
+  return null
+}
+
+/** One output, nbformat-like (what notebook-view.js reads): an error, printed text, or a plain-text value. */
+function outputOf(o) {
+  const item = (mime) => o.items.find((i) => i.mime === mime)
+  const err = item('application/vnd.code.notebook.error')
+  if (err) {
+    try {
+      const e = JSON.parse(decoder.decode(err.data))
+      return { output_type: 'error', ename: e.name, evalue: e.message }
+    } catch {
+      return null
+    }
+  }
+  const streams = o.items.filter((i) => i.mime === 'application/vnd.code.notebook.stdout' || i.mime === 'application/vnd.code.notebook.stderr')
+  if (streams.length) return { output_type: 'stream', text: streams.map((i) => decoder.decode(i.data)).join('') }
+  const plain = item('text/plain')
+  return plain ? { output_type: 'execute_result', data: { 'text/plain': decoder.decode(plain.data) } } : null
+}
+
+function cellsOf(nb) {
+  return nb.getCells().map((c) => ({
+    kind: c.kind === vscode.NotebookCellKind.Code ? 'code' : 'markdown',
+    source: c.document.getText(),
+    outputs: c.outputs.map(outputOf).filter(Boolean)
+  }))
+}
+
+/**
+ * Where the learner is: { file, line, col, doc?, nb?, view? }. In a notebook, `file` is the .ipynb and `line` is in
+ * the coach's view of it. Null when they are not in a file of theirs.
+ */
+function activeSpot() {
   const ed = vscode.window.activeTextEditor
-  return ed && ed.document.uri.scheme === 'file' ? ed : null
+  if (ed && ed.document.uri.scheme === 'file') {
+    const pos = ed.selection.active
+    return { file: ed.document.uri.fsPath, line: pos.line + 1, col: pos.character + 1, doc: ed.document }
+  }
+  if (ed && ed.document.uri.scheme === 'vscode-notebook-cell') {
+    const hit = notebookOfCell(ed.document)
+    if (hit && hit.nb.uri.scheme === 'file') {
+      const view = notebookView(cellsOf(hit.nb))
+      const pos = ed.selection.active
+      return { file: hit.nb.uri.fsPath, line: view.starts[hit.index] + pos.line, col: pos.character + 1, nb: hit.nb, view }
+    }
+  }
+  const ned = vscode.window.activeNotebookEditor
+  if (ned && ned.notebook.uri.scheme === 'file') {
+    const view = notebookView(cellsOf(ned.notebook))
+    const cell = ned.selection ? ned.selection.start : 0
+    return { file: ned.notebook.uri.fsPath, line: view.starts[cell] || 1, col: 1, nb: ned.notebook, view }
+  }
+  return null
 }
 
 function sendHello() {
@@ -54,36 +129,44 @@ function sendHello() {
 }
 
 function sendEditor() {
-  const ed = fileEditor()
-  if (!ed) return send({ type: 'editor', file: null, line: 0, col: 0 })
-  const pos = ed.selection.active
-  send({ type: 'editor', file: ed.document.uri.fsPath, line: pos.line + 1, col: pos.character + 1 })
+  const s = activeSpot()
+  if (!s) return send({ type: 'editor', file: null, line: 0, col: 0 })
+  send({ type: 'editor', file: s.file, line: s.line, col: s.col })
 }
 
 function sendDoc() {
-  const ed = fileEditor()
-  if (!ed) return
-  send({ type: 'doc', file: ed.document.uri.fsPath, text: ed.document.getText().slice(0, MAX_TEXT) })
+  const s = activeSpot()
+  if (!s) return
+  const text = s.nb ? s.view.lines.join('\n') : s.doc.getText()
+  send({ type: 'doc', file: s.file, text: text.slice(0, MAX_TEXT) })
 }
 
+function diagItem(d, line) {
+  const code = d.code === undefined || d.code === null ? undefined : typeof d.code === 'object' ? String(d.code.value) : String(d.code)
+  return {
+    line,
+    col: d.range.start.character + 1,
+    severity: d.severity === vscode.DiagnosticSeverity.Error ? 'error' : 'warning',
+    ...(code ? { code: code.slice(0, 40) } : {}),
+    message: d.message.slice(0, 400)
+  }
+}
+
+const shown = (d) => d.severity <= vscode.DiagnosticSeverity.Warning
+
 function sendDiagnostics() {
-  const ed = fileEditor()
-  if (!ed) return
-  const items = vscode.languages
-    .getDiagnostics(ed.document.uri)
-    .filter((d) => d.severity <= vscode.DiagnosticSeverity.Warning)
-    .slice(0, 20)
-    .map((d) => {
-      const code = d.code === undefined || d.code === null ? undefined : typeof d.code === 'object' ? String(d.code.value) : String(d.code)
-      return {
-        line: d.range.start.line + 1,
-        col: d.range.start.character + 1,
-        severity: d.severity === vscode.DiagnosticSeverity.Error ? 'error' : 'warning',
-        ...(code ? { code: code.slice(0, 40) } : {}),
-        message: d.message.slice(0, 400)
-      }
+  const s = activeSpot()
+  if (!s) return
+  let items
+  if (s.nb) {
+    items = []
+    s.nb.getCells().forEach((cell, i) => {
+      for (const d of vscode.languages.getDiagnostics(cell.document.uri).filter(shown)) items.push(diagItem(d, s.view.starts[i] + d.range.start.line))
     })
-  send({ type: 'diagnostics', file: ed.document.uri.fsPath, items })
+  } else {
+    items = vscode.languages.getDiagnostics(s.doc.uri).filter(shown).map((d) => diagItem(d, d.range.start.line + 1))
+  }
+  send({ type: 'diagnostics', file: s.file, items: items.slice(0, 20) })
 }
 
 function sendAll() {
@@ -92,6 +175,8 @@ function sendAll() {
   sendDoc()
   sendDiagnostics()
 }
+
+// ── The link ──
 
 function connect() {
   if (disposed) return
@@ -123,6 +208,7 @@ function connect() {
     socket = null
     status.text = '$(circle-slash) BetterCoder'
     status.tooltip = 'BetterCoder app is not running'
+    if (runTerm && !runTerm.done) finishRun(runTerm, `${RED}The BetterCoder app closed, so this run stopped.${RESET}`)
     if (!disposed) retry = setTimeout(connect, RETRY_MS)
   }
   s.on('error', lost)
@@ -143,6 +229,20 @@ function receive(m) {
   } else if (m.type === 'status' && typeof m.text === 'string') {
     status.text = '$(sparkle) ' + m.text.slice(0, 80)
     status.tooltip = typeof m.tooltip === 'string' ? m.tooltip.slice(0, 200) : ''
+  } else if (m.type === 'term' && m.event && typeof m.event === 'object') {
+    onTerm(m.event)
+  } else if (m.type === 'run_error' && typeof m.message === 'string') {
+    const install = m.install && typeof m.install.url === 'string' && /^https:\/\//.test(m.install.url) ? m.install : null
+    if (runTerm && !runTerm.id && !runTerm.done) finishRun(runTerm, `${RED}${m.message}${RESET}${install ? `\r\n${DIM}Get it: ${install.url}${RESET}` : ''}`)
+    if (install) {
+      void vscode.window.showWarningMessage(`BetterCoder: ${m.message}`, 'Official install page').then((pick) => {
+        if (pick) void vscode.env.openExternal(vscode.Uri.parse(install.url))
+      })
+    } else if (!runTerm || runTerm.id) void vscode.window.showErrorMessage(`BetterCoder: ${m.message}`)
+  } else if (m.type === 'open' && typeof m.file === 'string') {
+    void openAt(m.file, Number.isInteger(m.line) ? m.line : null)
+  } else if (m.type === 'problems' && typeof m.file === 'string' && Array.isArray(m.items)) {
+    showRunProblems(m.file, m.items)
   }
 }
 
@@ -150,50 +250,84 @@ function samePath(a, b) {
   return path.resolve(a) === path.resolve(b)
 }
 
+// ── The step marker ──
+
 /** The step is in a file they don't have in front of them: offer to go there (never move them without asking). */
 function offerToGo() {
   if (!anchor || !vscode.window.state.focused) return
-  const ed = fileEditor()
-  if (ed && samePath(ed.document.uri.fsPath, anchor.file)) return
-  const where = `${path.basename(anchor.file)} line ${anchor.line}`
+  const s = activeSpot()
+  if (s && samePath(s.file, anchor.file)) return
+  const where = /\.ipynb$/i.test(anchor.file) ? path.basename(anchor.file) : `${path.basename(anchor.file)} line ${anchor.line}`
   void vscode.window.showInformationMessage(`BetterCoder: the next step goes in ${where}`, 'Go there').then((pick) => {
     if (pick) void goToStep()
   })
 }
 
 async function goToStep() {
-  if (!anchor) return
-  const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(anchor.file))
+  if (anchor) await openAt(anchor.file, anchor.line)
+}
+
+/** Show a file at a line (1-based; in a notebook, a line of the coach's view, so it lands on the right cell). */
+async function openAt(file, lineNo) {
+  const uri = vscode.Uri.file(file)
+  if (/\.ipynb$/i.test(file)) {
+    const nb = await vscode.workspace.openNotebookDocument(uri)
+    const at = (lineNo && cellAt(notebookView(cellsOf(nb)), lineNo)) || { cell: 0, line: 0 }
+    const range = new vscode.NotebookRange(at.cell, at.cell + 1)
+    const ned = await vscode.window.showNotebookDocument(nb, { selections: [range] })
+    ned.revealRange(range, vscode.NotebookEditorRevealType.InCenterIfOutsideViewport)
+    await vscode.commands.executeCommand('notebook.cell.edit')
+    return
+  }
+  const doc = await vscode.workspace.openTextDocument(uri)
   const ed = await vscode.window.showTextDocument(doc)
-  const line = Math.min(anchor.line - 1, doc.lineCount - 1)
+  const line = Math.max(0, Math.min((lineNo || 1) - 1, doc.lineCount - 1))
   const pos = new vscode.Position(line, doc.lineAt(line).firstNonWhitespaceCharacterIndex)
   ed.selection = new vscode.Selection(pos, pos)
   ed.revealRange(new vscode.Range(pos, pos), vscode.TextEditorRevealType.InCenterIfOutsideViewport)
 }
 
+/** The marked line (0-based) in this editor, or -1 when the step is not in it. */
+function markedLine(ed, views) {
+  if (!anchor) return -1
+  const uri = ed.document.uri
+  if (uri.scheme === 'file') return samePath(uri.fsPath, anchor.file) ? anchor.line - 1 : -1
+  if (uri.scheme !== 'vscode-notebook-cell') return -1
+  const hit = notebookOfCell(ed.document)
+  if (!hit || !samePath(hit.nb.uri.fsPath, anchor.file)) return -1
+  if (!views.has(hit.nb)) views.set(hit.nb, notebookView(cellsOf(hit.nb)))
+  const at = cellAt(views.get(hit.nb), anchor.line)
+  return at && at.cell === hit.index ? at.line : -1
+}
+
 function render() {
+  const views = new Map()
   for (const ed of vscode.window.visibleTextEditors) {
-    if (!anchor || ed.document.uri.scheme !== 'file' || !samePath(ed.document.uri.fsPath, anchor.file)) {
+    const marked = markedLine(ed, views)
+    if (marked < 0) {
       ed.setDecorations(markerType, [])
       ed.setDecorations(ghostType, [])
       continue
     }
     const doc = ed.document
-    const a = Math.min(Math.max(0, anchor.line - 1), doc.lineCount - 1)
+    const a = Math.min(Math.max(0, marked), doc.lineCount - 1)
     ed.setDecorations(markerType, [new vscode.Range(a, 0, a, 0)])
     const lines = []
     for (let i = 0; i < doc.lineCount; i++) lines.push(doc.lineAt(i).text)
     const at = ghostAt(lines, a, ed.selection.active.line, anchor.ghost)
     if (at.ghost) {
       const end = doc.lineAt(at.ghost.line).range.end
-      ed.setDecorations(ghostType, [
-        {
-          range: new vscode.Range(end, end),
-          renderOptions: { after: { contentText: '◆ ' + at.ghost.text } }
-        }
-      ])
+      ed.setDecorations(ghostType, [{ range: new vscode.Range(end, end), renderOptions: { after: { contentText: '◆ ' + at.ghost.text } } }])
     } else {
       ed.setDecorations(ghostType, [])
+    }
+    if (ed === vscode.window.activeTextEditor) {
+      const n = typedCount(lines, a, ed.selection.active.line, anchor.ghost.length)
+      const key = `${anchor.stepId}:${n}`
+      if (key !== typedSent) {
+        typedSent = key
+        send({ type: 'step_typed', stepId: anchor.stepId, n })
+      }
     }
     if (at.done && doneSent !== anchor.stepId && ed === vscode.window.activeTextEditor) {
       doneSent = anchor.stepId
@@ -201,6 +335,128 @@ function render() {
     }
   }
 }
+
+// ── ▶ Run ──
+
+/** ▶ Run: the file in the title bar (or the open one). A notebook runs all its cells in its own kernel instead. */
+async function runFile(uri) {
+  const s = activeSpot()
+  const file = uri && uri.scheme === 'file' ? uri.fsPath : s ? s.file : null
+  if (!file) return
+  if (/\.ipynb$/i.test(file)) return vscode.commands.executeCommand('notebook.execute')
+  if (!socket) return vscode.window.showWarningMessage('BetterCoder: the app is not connected, so Run is not available.')
+  const doc = vscode.workspace.textDocuments.find((d) => d.uri.scheme === 'file' && samePath(d.uri.fsPath, file))
+  if (doc && doc.isDirty) await doc.save()
+
+  if (runTerm) runTerm.terminal.dispose()
+  const write = new vscode.EventEmitter()
+  const state = { id: null, file, done: false, terminal: null, write }
+  const live = () => state.id && !state.done
+  const pty = {
+    onDidWrite: write.event,
+    open: (dims) => {
+      write.fire(`${DIM}▶ ${path.basename(file)}${RESET}\r\n`)
+      send({ type: 'run', file, cols: (dims && dims.columns) || 80, rows: (dims && dims.rows) || 24 })
+    },
+    close: () => {
+      if (live()) send({ type: 'term_stop', id: state.id })
+      if (runTerm === state) runTerm = null
+    },
+    handleInput: (data) => {
+      if (live()) send({ type: 'term_input', id: state.id, data })
+    },
+    setDimensions: (d) => {
+      if (live()) send({ type: 'term_resize', id: state.id, cols: d.columns, rows: d.rows })
+    }
+  }
+  state.terminal = vscode.window.createTerminal({ name: '▶ Run', pty, iconPath: new vscode.ThemeIcon('play') })
+  runTerm = state
+  state.terminal.show(false)
+}
+
+function finishRun(state, line) {
+  state.done = true
+  if (line) state.write.fire(`\r\n${line}\r\n`)
+}
+
+function onTerm(e) {
+  const t = runTerm
+  if (!t) return
+  if (e.type === 'run' && e.run && typeof e.run.id === 'string') {
+    if (!t.id && e.run.endedAt === null) t.id = e.run.id
+    if (e.run.id !== t.id || e.run.endedAt === null || t.done) return
+    const lines = []
+    if (typeof e.run.words === 'string' && e.run.words) lines.push(`${PINK}In words:${RESET} ${e.run.words}`)
+    lines.push(`${DIM}${e.run.stopped ? 'Stopped' : `Finished · exit ${e.run.exitCode}`}${RESET}`)
+    finishRun(t, lines.join('\r\n'))
+  } else if (e.type === 'data' && e.id === t.id && typeof e.data === 'string') {
+    t.write.fire(e.data)
+  }
+}
+
+function showRunProblems(file, items) {
+  const uri = vscode.Uri.file(file)
+  if (items.length === 0) return runProblems.delete(uri)
+  runProblems.clear()
+  runProblems.set(
+    uri,
+    items.map((i) => {
+      const line = Math.max(0, (i.line || 1) - 1)
+      const d = new vscode.Diagnostic(new vscode.Range(line, Math.max(0, (i.col || 1) - 1), line, 10000), String(i.message), vscode.DiagnosticSeverity.Error)
+      d.source = 'BetterCoder ▶ Run'
+      return d
+    })
+  )
+}
+
+// ── Inside BetterCoder only: no AI, nothing typed in for them ──
+
+/** Set by BetterCoder when it starts its own VS Code. In the learner's own VS Code, this extension only links. */
+const EMBEDDED = process.env.BETTERCODER_EMBEDDED === '1'
+
+/** Settings that stay as BetterCoder sets them (the app puts them back on every start too). */
+const LOCKED = {
+  'chat.disableAIFeatures': true,
+  'editor.inlineSuggest.enabled': false,
+  'editor.inlayHints.enabled': 'off',
+  'editor.snippetSuggestions': 'none',
+  'editor.suggest.showSnippets': false,
+  'editor.tabCompletion': 'off'
+}
+const removing = new Set()
+
+/** An AI extension was installed (from the Extensions view): it is removed at once. */
+async function removeAiExtensions() {
+  for (const ext of vscode.extensions.all) {
+    const pj = ext.packageJSON || {}
+    if (pj.isBuiltin || removing.has(ext.id) || !isAiExtension(ext.id, pj)) continue
+    removing.add(ext.id)
+    try {
+      await vscode.commands.executeCommand('workbench.extensions.uninstallExtension', ext.id)
+      void vscode.window.showInformationMessage(`BetterCoder removed ${pj.displayName || ext.id}: it writes code for you. Here, you write it.`)
+    } catch {
+      removing.delete(ext.id)
+    }
+  }
+}
+
+/** One of the locked settings was changed: it goes back. */
+async function keepLocked(e) {
+  for (const [key, want] of Object.entries(LOCKED)) {
+    if (e && !e.affectsConfiguration(key)) continue
+    const dot = key.lastIndexOf('.')
+    const config = vscode.workspace.getConfiguration(key.slice(0, dot))
+    const name = key.slice(dot + 1)
+    const now = config.inspect(name)
+    const wrong = [now?.globalValue, now?.workspaceValue, now?.workspaceFolderValue].some((v) => v !== undefined && v !== want)
+    if (!wrong) continue
+    await config.update(name, want, vscode.ConfigurationTarget.Global)
+    if (now?.workspaceValue !== undefined) await config.update(name, undefined, vscode.ConfigurationTarget.Workspace)
+    if (e) void vscode.window.showInformationMessage('BetterCoder keeps that off: here, you write the code.')
+  }
+}
+
+// ── Start ──
 
 function activate(context) {
   status = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100)
@@ -218,17 +474,31 @@ function activate(context) {
   ghostType = vscode.window.createTextEditorDecorationType({
     after: { color: '#C98A92', fontStyle: 'italic', margin: '0 0 0 2em' }
   })
+  runProblems = vscode.languages.createDiagnosticCollection('bettercoder-run')
+
+  const activeDoc = () => {
+    const ed = vscode.window.activeTextEditor
+    return ed ? ed.document : null
+  }
 
   context.subscriptions.push(
     status,
     markerType,
     ghostType,
+    runProblems,
     vscode.commands.registerCommand('bettercoder.reconnect', () => {
       socket?.destroy()
       connect()
     }),
     vscode.commands.registerCommand('bettercoder.goToStep', () => goToStep()),
+    vscode.commands.registerCommand('bettercoder.run', (uri) => runFile(uri)),
     vscode.window.onDidChangeActiveTextEditor(() => {
+      sendEditor()
+      sendDoc()
+      sendDiagnostics()
+      render()
+    }),
+    vscode.window.onDidChangeActiveNotebookEditor(() => {
       sendEditor()
       sendDoc()
       sendDiagnostics()
@@ -240,22 +510,35 @@ function activate(context) {
       debounce('editor', 150, sendEditor)
     }),
     vscode.workspace.onDidChangeTextDocument((e) => {
-      const ed = fileEditor()
-      if (!ed || e.document !== ed.document) return
+      const doc = activeDoc()
+      if (!doc || e.document !== doc) return
       render()
       debounce('doc', 500, sendDoc)
     }),
-    vscode.languages.onDidChangeDiagnostics((e) => {
-      const ed = fileEditor()
-      if (ed && e.uris.some((u) => u.toString() === ed.document.uri.toString())) debounce('diag', 300, sendDiagnostics)
+    // A notebook's cells or outputs changed (a cell ran, was added or moved): its view and the marker move with it.
+    vscode.workspace.onDidChangeNotebookDocument((e) => {
+      const s = activeSpot()
+      if (!s || !s.nb || e.notebook !== s.nb) return
+      render()
+      debounce('doc', 500, sendDoc)
     }),
+    vscode.languages.onDidChangeDiagnostics(() => debounce('diag', 300, sendDiagnostics)),
     vscode.workspace.onDidChangeWorkspaceFolders(() => sendHello()),
     // The window in front is the one BetterCoder follows.
     vscode.window.onDidChangeWindowState((s) => {
       if (s.focused) sendEditor()
     })
   )
-  connect()
+  if (EMBEDDED) {
+    context.subscriptions.push(
+      vscode.extensions.onDidChange(() => void removeAiExtensions()),
+      vscode.workspace.onDidChangeConfiguration((e) => void keepLocked(e))
+    )
+    void removeAiExtensions()
+    void keepLocked(null)
+    connect()
+  }
+  // In someone's own VS Code (an old dev install), it stays quiet: BetterCoder only follows its built-in VS Code.
 }
 
 function deactivate() {

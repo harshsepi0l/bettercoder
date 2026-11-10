@@ -2,7 +2,8 @@ import { sep } from 'node:path'
 
 /**
  * The read-only rules, pure: which files hold secrets, and masking secrets in text the model will see.
- * The one place that touches the learner's files is adapters/fs-readonly.ts.
+ * The coach reads the learner's files only through adapters/fs-readonly.ts; only the learner writes, in the Code tab's
+ * VS Code.
  */
 
 const SECRET_FILES: RegExp[] = [

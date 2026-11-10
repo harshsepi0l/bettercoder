@@ -42,6 +42,8 @@ export class WorkspaceController {
       opened?: (project: ProjectInfo) => void
       /** The learner's editor, when the link is running. */
       ide?: IdeHub
+      /** A session closed (or another one opened): end what belonged to it, such as its terminals. */
+      closed?: (sessionId: string) => void
     }
   ) {}
 
@@ -77,6 +79,11 @@ export class WorkspaceController {
   /** The open session's project, if any. */
   activeProject(): OpenSession['project'] | null {
     return this.active?.open.project ?? null
+  }
+
+  /** The open session's id, or null. */
+  activeSessionId(): string | null {
+    return this.active?.record.id ?? null
   }
 
   list(): Promise<ProjectSummary[]> {
@@ -194,12 +201,13 @@ export class WorkspaceController {
 
   private async closeActive(deleting: boolean): Promise<void> {
     if (!this.active) return
-    const { coach } = this.active
+    const { coach, record } = this.active
     // The record is saved wherever it changes (send, rename); the timestamp moves only on send, so leaving a
     // session never reorders the sidebar.
     if (deleting) await coach.abort().catch(() => undefined)
     this.active = null
     this.deps.ide?.setSession(null)
+    this.deps.closed?.(record.id)
     await coach.close().catch(() => undefined)
     if (deleting) this.deps.emit({ type: 'session_closed' })
   }

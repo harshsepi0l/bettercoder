@@ -1,18 +1,61 @@
 {
   "name": "bettercoder-ide",
   "displayName": "BetterCoder",
-  "description": "Links your editor to the BetterCoder coach: it sees where you are, marks where to write, and shows the step's pseudocode faded. It never writes into your files.",
+  "description": "Links the editor to the BetterCoder coach: it sees where you are, marks where to write, shows the step's pseudocode faded, and runs your file with ▶ Run. It never writes into your files.",
   "version": "0.1.0",
   "publisher": "bettercoder",
   "private": true,
-  "engines": { "vscode": "^1.90.0" },
-  "categories": ["Education"],
-  "activationEvents": ["onStartupFinished"],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Education"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
-      { "command": "bettercoder.reconnect", "title": "BetterCoder: Reconnect" },
-      { "command": "bettercoder.goToStep", "title": "BetterCoder: Go to the current step" }
+      {
+        "command": "bettercoder.reconnect",
+        "title": "BetterCoder: Reconnect"
+      },
+      {
+        "command": "bettercoder.goToStep",
+        "title": "BetterCoder: Go to the current step"
+      },
+      {
+        "command": "bettercoder.run",
+        "title": "Run",
+        "category": "BetterCoder",
+        "icon": "$(play)"
+      }
+    ],
+    "themes": [
+      {
+        "label": "BetterCoder Dark",
+        "uiTheme": "vs-dark",
+        "path": "./themes/bettercoder-dark.json"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "bettercoder.run",
+          "when": "resourceScheme == file && resourceExtname =~ /^\\.(py|js|mjs|cjs|ts|mts|cts|cs|java|kt|swift|c|cc|cpp|cxx)$/i",
+          "group": "navigation@-10"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "bettercoder.run",
+        "key": "cmd+enter",
+        "win": "ctrl+enter",
+        "linux": "ctrl+enter",
+        "when": "editorTextFocus && !notebookEditorFocused && resourceExtname =~ /^\\.(py|js|mjs|cjs|ts|mts|cts|cs|java|kt|swift|c|cc|cpp|cxx)$/i"
+      }
     ]
   }
 }

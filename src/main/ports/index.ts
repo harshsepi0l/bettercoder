@@ -29,6 +29,7 @@ export interface ProjectFiles {
   read(abs: string): Promise<Uint8Array>
 }
 
+
 // ── Animator ───────────────────────────────────────────────────────
 
 export interface RunRequest {
@@ -111,12 +112,38 @@ export interface EditorSnapshot {
   errors: { key: string; since: number } | null
   /** Step ids the editor reported as fully typed. */
   stepsDone: Set<string>
+  /** How many pseudocode lines of a step they have typed so far (the editor reports it as they write). */
+  stepTyped: { stepId: string; n: number } | null
 }
 
 /** The live line to the learner's editor. */
 export interface EditorFeed {
   snapshot(): EditorSnapshot | null
   send(message: ToIde): void
+}
+
+// ── The learner's terminals (theirs alone: the coach never types or reads a shell) ──
+
+export interface TerminalSpawn {
+  /** The program to start for a Run (an interpreter, a compiler's shell line, dotnet, …). */
+  command: string
+  args: string[]
+  cwd: string
+  env: Record<string, string>
+  cols: number
+  rows: number
+}
+
+/** Real terminals (a pseudo-terminal each), so input(), colours, Ctrl+C and full-screen programs work. */
+export interface Terminals {
+  /** Start a process in a new terminal; returns its id. Throws if it can't start. */
+  spawn(opts: TerminalSpawn): string
+  write(id: string, data: string): void
+  resize(id: string, cols: number, rows: number): void
+  /** End the process and everything it started. */
+  kill(id: string): void
+  onData(listener: (id: string, data: string) => void): () => void
+  onExit(listener: (id: string, exitCode: number | null, signal: number | null) => void): () => void
 }
 
 /** Everything the coach needs from outside, in one bundle. */

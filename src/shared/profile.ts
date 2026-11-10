@@ -63,6 +63,7 @@ export function cleanProfile(raw: unknown): LearnerProfile {
   const notes = typeof r.notes === 'string' ? r.notes.replace(/\r/g, '').trim().slice(0, NOTES_MAX) : ''
   const skills = Array.isArray(r.skills) ? r.skills.flatMap((x) => cleanSkill(x) ?? []).slice(-MAX_SKILLS) : []
   const codeView = r.codeView === 'highlight' || r.codeView === 'stepper' ? (r.codeView as CodeView) : undefined
+  // An old `editor` choice ("own" editor link) is dropped: the Code tab's VS Code is the only editor now.
   return { styles, notes, onboarded: r.onboarded === true, skills, ...(codeView ? { codeView } : {}) }
 }
 

@@ -13,13 +13,19 @@ export function CoachTab({
   onOpenProject,
   coach,
   hasModel,
-  onOpenSettings
+  onOpenSettings,
+  inPane = false,
+  typed
 }: {
   project: ProjectInfo | null
   onOpenProject: () => void
   coach: Coach
   hasModel: boolean
   onOpenSettings: () => void
+  /** In the coach pane beside the editor: the pane shows its own meters row. */
+  inPane?: boolean
+  /** The newest step card and how many of its lines they have written. */
+  typed?: { id: string; n: number }
 }) {
   if (!project) {
     return (
@@ -33,15 +39,15 @@ export function CoachTab({
           </Button>
         }
       >
-        Pick the folder you're working in, or just the files you want help with. BetterCoder only reads them; it never
-        changes a file.
+        Pick the folder you're working in, or just the files you want help with. You write the code; the coach only
+        reads it and never changes a file.
       </EmptyState>
     )
   }
 
   return (
     <>
-      {project.root && <IdeMeter busy={coach.busy} onSend={coach.send} />}
+      {project.root && !inPane && <IdeMeter busy={coach.busy} onSend={coach.send} />}
       <ScrollArea className="min-h-0 flex-1">
         <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-3.5">
           {coach.items.length === 0 && project.root ? <ProjectCard project={project} /> : <ProjectLine project={project} />}
@@ -66,7 +72,7 @@ export function CoachTab({
             )}
           </div>
         ) : (
-          <ChatView items={coach.items} busy={coach.busy} onAnswer={coach.send} />
+          <ChatView items={coach.items} busy={coach.busy} onAnswer={coach.send} typed={typed} />
         )}
       </div>
     </ScrollArea>

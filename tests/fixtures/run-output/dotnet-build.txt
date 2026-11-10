@@ -1,0 +1,3 @@
+/work/proj/Program.cs(2,14): error CS1003: Syntax error, ',' expected [/work/proj/cs.csproj]
+
+The build failed. Fix the build errors and run again.

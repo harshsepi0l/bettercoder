@@ -2,8 +2,11 @@ import { chmod, mkdir, rm } from 'node:fs/promises'
 import { createServer, type Server, type Socket } from 'node:net'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { FromIde, IdeDiagnostic, ToIde } from '../../shared/ide'
+import type { FromIde, IdeCommand, ToIde } from '../../shared/ide'
 import type { EditorFeed, EditorSnapshot } from '../ports'
+import { MAX_LINE, applyFromIde, emptySnapshot, isIdeCommand, parseIdeMessage } from './editor-snapshot'
+
+export { errorKey, parseIdeMessage } from './editor-snapshot'
 
 /**
  * The local socket the editor extension connects to. One JSON message per line. The socket lives in a folder only
@@ -11,81 +14,12 @@ import type { EditorFeed, EditorSnapshot } from '../ports'
  */
 
 export const DEFAULT_SOCKET = join(homedir(), '.bettercoder', 'ide.sock')
-/** A longer line is dropped: no editor message needs more (doc text is capped by the extension too). */
-const MAX_LINE = 600_000
-const MAX_TEXT = 400_000
-const MAX_DIAGNOSTICS = 20
-
-
-/** Parse one line from the editor. Anything malformed is ignored, never thrown. */
-export function parseIdeMessage(line: string): FromIde | null {
-  if (line.length > MAX_LINE) return null
-  let m: unknown
-  try {
-    m = JSON.parse(line)
-  } catch {
-    return null
-  }
-  if (!m || typeof m !== 'object') return null
-  const o = m as Record<string, unknown>
-  const str = (v: unknown, max = 4096) => (typeof v === 'string' && v.length <= max ? v : null)
-  const int = (v: unknown) => (typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 10_000_000 ? v : null)
-  switch (o.type) {
-    case 'hello': {
-      const ide = str(o.ide, 40)
-      const folders = Array.isArray(o.folders) ? o.folders.map((f) => str(f)).filter((f): f is string => !!f).slice(0, 20) : []
-      return ide ? { type: 'hello', ide, folders } : null
-    }
-    case 'editor': {
-      const line = int(o.line)
-      const col = int(o.col)
-      const file = o.file === null ? null : str(o.file)
-      if (line === null || col === null || file === undefined) return null
-      if (o.file !== null && file === null) return null
-      return { type: 'editor', file, line, col }
-    }
-    case 'doc': {
-      const file = str(o.file)
-      const text = str(o.text, MAX_TEXT)
-      return file && text !== null ? { type: 'doc', file, text } : null
-    }
-    case 'diagnostics': {
-      const file = str(o.file)
-      if (!file || !Array.isArray(o.items)) return null
-      const items: IdeDiagnostic[] = []
-      for (const d of o.items.slice(0, MAX_DIAGNOSTICS)) {
-        if (!d || typeof d !== 'object') continue
-        const x = d as Record<string, unknown>
-        const line = int(x.line)
-        const col = int(x.col)
-        const message = str(x.message, 400)
-        if (line === null || col === null || !message) continue
-        const code = str(x.code, 40)
-        items.push({ line, col, severity: x.severity === 'error' ? 'error' : 'warning', ...(code ? { code } : {}), message })
-      }
-      return { type: 'diagnostics', file, items }
-    }
-    case 'step_done': {
-      const stepId = str(o.stepId, 200)
-      return stepId ? { type: 'step_done', stepId } : null
-    }
-    default:
-      return null
-  }
-}
-
-/** The same errors (by code and message, not line: lines move as they type) count as one unchanged problem. */
-export function errorKey(items: readonly IdeDiagnostic[]): string {
-  return items
-    .filter((d) => d.severity === 'error')
-    .map((d) => `${d.code ?? ''}:${d.message}`)
-    .sort()
-    .join('\n')
-}
 
 interface Connection {
   socket: Socket
   snap: EditorSnapshot
+  /** When this window last sent anything (ms). */
+  lastAt: number
 }
 
 export class IdeBridge implements EditorFeed {
@@ -96,6 +30,10 @@ export class IdeBridge implements EditorFeed {
   /** Sent again to every editor that connects, so a restarted editor gets its marker back. */
   private lastAnchor: ToIde | null = null
   private lastStatus: ToIde | null = null
+  /** "Open in editor" asked for before the editor connected (the Code tab was only now opening it). */
+  private pendingOpen: { message: ToIde; at: number } | null = null
+  /** Who handles ▶ Run and terminal keystrokes from the editor (the Code area), once it is ready. */
+  private commands: ((m: IdeCommand) => void) | null = null
 
   constructor(
     private readonly onChange: () => void,
@@ -133,10 +71,24 @@ export class IdeBridge implements EditorFeed {
     return this.active?.snap ?? null
   }
 
+  /** When the learner last used the followed window, for choosing between it and the built-in editor. */
+  lastActivityAt(): number | null {
+    return this.active?.lastAt ?? null
+  }
+
+  /** ▶ Run and terminal keystrokes from the editor go to this handler. */
+  onCommand(handler: (m: IdeCommand) => void): void {
+    this.commands = handler
+  }
+
   /** Send to every connected editor (each shows the marker only on its own copy of the file). */
   send(message: ToIde): void {
     if (message.type === 'anchor' || message.type === 'clear') this.lastAnchor = message
     if (message.type === 'status') this.lastStatus = message
+    if (message.type === 'open' && this.connections.size === 0) {
+      this.pendingOpen = { message, at: this.now() }
+      return
+    }
     const line = `${JSON.stringify(message)}\n`
     for (const c of this.connections) if (!c.socket.destroyed) c.socket.write(line)
   }
@@ -144,7 +96,8 @@ export class IdeBridge implements EditorFeed {
   private accept(socket: Socket): void {
     const conn: Connection = {
       socket,
-      snap: { ide: 'Editor', folders: [], file: null, line: 0, col: 0, text: null, diagnostics: [], lastEditAt: null, errors: null, stepsDone: new Set() }
+      snap: emptySnapshot(),
+      lastAt: this.now()
     }
     this.connections.add(conn)
     socket.setEncoding('utf8')
@@ -171,45 +124,20 @@ export class IdeBridge implements EditorFeed {
     socket.on('close', gone)
     socket.on('error', gone)
     for (const m of [this.lastAnchor, this.lastStatus]) if (m) socket.write(`${JSON.stringify(m)}\n`)
+    if (this.pendingOpen && this.now() - this.pendingOpen.at < 60_000) socket.write(`${JSON.stringify(this.pendingOpen.message)}\n`)
+    this.pendingOpen = null
   }
 
   private apply(conn: Connection, m: FromIde): void {
-    const s = conn.snap
-    const now = this.now()
-    switch (m.type) {
-      case 'hello':
-        s.ide = m.ide
-        s.folders = m.folders
-        if (!this.active) this.active = conn
-        break
-      case 'editor':
-        // A window reports its editor when it gains focus: that window is the one to follow.
-        this.active = conn
-        if (m.file !== s.file) {
-          s.text = null
-          s.diagnostics = []
-          s.errors = null
-        }
-        s.file = m.file
-        s.line = m.line
-        s.col = m.col
-        break
-      case 'doc':
-        if (m.file !== s.file) return
-        if (s.text !== null && s.text !== m.text) s.lastEditAt = now
-        s.text = m.text
-        break
-      case 'diagnostics': {
-        if (m.file !== s.file) return
-        s.diagnostics = m.items
-        const key = errorKey(m.items)
-        s.errors = !key ? null : s.errors?.key === key ? s.errors : { key, since: now }
-        break
-      }
-      case 'step_done':
-        s.stepsDone.add(m.stepId)
-        break
+    if (isIdeCommand(m)) {
+      conn.lastAt = this.now()
+      this.commands?.(m)
+      return
     }
+    // A window says hello, or reports its editor when it gains focus: that window is the one to follow.
+    if (m.type === 'editor' || (m.type === 'hello' && !this.active)) this.active = conn
+    if (!applyFromIde(conn.snap, m, this.now())) return
+    conn.lastAt = this.now()
     this.onChange()
   }
 }

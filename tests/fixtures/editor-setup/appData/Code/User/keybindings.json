@@ -1,0 +1,7 @@
+// Place your key bindings in this file
+[
+  { "key": "cmd+k cmd+t", "command": "workbench.action.selectTheme" },
+  { "key": "tab", "command": "editor.action.inlineSuggest.commit" },
+  { "key": "cmd+i", "command": "workbench.action.chat.open" },
+  { "key": "cmd+shift+d", "command": "-editor.action.copyLinesDownAction" },
+]

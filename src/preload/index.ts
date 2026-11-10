@@ -5,6 +5,8 @@ import { WORKSPACE_IPC, type WorkspaceApi } from '../shared/workspace'
 import { VISUALIZE_IPC, type VisualizeApi } from '../shared/visualize'
 import { MAP_IPC, type MapApi } from '../shared/map'
 import { IDE_IPC, type IdeApi, type IdeView } from '../shared/ide'
+import { EDITOR_IMPORT_IPC, type EditorImportApi } from '../shared/editor-import'
+import { CODE_IPC, type CodeApi } from '../shared/code'
 
 const api: BetterCoderApi = {
   platform: process.platform,
@@ -63,10 +65,24 @@ const ide: IdeApi = {
   getState: () => ipcRenderer.invoke(IDE_IPC.getState),
   onState: (listener) => listen<IdeView>(IDE_IPC.state, listener),
   openFolder: () => ipcRenderer.invoke(IDE_IPC.openFolder),
-  openInEditor: (path, line) => ipcRenderer.invoke(IDE_IPC.openInEditor, path, line)
+  openInEditor: (path, line) => ipcRenderer.invoke(IDE_IPC.openInEditor, path, line),
+  onShowCode: (listener) => listen<void>(IDE_IPC.showCode, () => listener())
+}
+
+const code: CodeApi = {
+  vscodeUrl: () => ipcRenderer.invoke(CODE_IPC.vscodeUrl)
 }
 
 contextBridge.exposeInMainWorld('bettercoder', api)
+const editorImport: EditorImportApi = {
+  sources: () => ipcRenderer.invoke(EDITOR_IMPORT_IPC.sources),
+  plan: (source) => ipcRenderer.invoke(EDITOR_IMPORT_IPC.plan, source),
+  run: (source) => ipcRenderer.invoke(EDITOR_IMPORT_IPC.run, source),
+  onRestarted: (listener) => listen<void>(EDITOR_IMPORT_IPC.restarted, () => listener())
+}
+
+contextBridge.exposeInMainWorld('code', code)
+contextBridge.exposeInMainWorld('editorImport', editorImport)
 contextBridge.exposeInMainWorld('ide', ide)
 contextBridge.exposeInMainWorld('codeMap', codeMap)
 contextBridge.exposeInMainWorld('visualize', visualize)

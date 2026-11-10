@@ -4,6 +4,8 @@ import type { AnchoredStep } from '../coach/replay'
 import type { EditorFeed, EditorSnapshot } from '../ports'
 import { editorContext, visiblePath } from './editor-context'
 import { feeling } from '../core/feeling'
+import { runView } from '../core/run-view'
+import type { RunSummary } from '../../shared/code'
 
 const MOOD_WORD: Record<Mood, string> = { stuck: 'stuck', ok: 'ok', flowing: 'flowing' }
 /** Feeling changes with time alone (a pause becomes "stuck"), so it is checked now and then too. */
@@ -19,6 +21,8 @@ export class IdeHub {
   private tasks: TaskProgress[] = []
   private timer: ReturnType<typeof setInterval> | null = null
   private lastView = ''
+  /** The learner's last ▶ Run in this session (memory only, never stored). */
+  private lastRun: RunSummary | null = null
 
   constructor(
     private readonly bridge: EditorFeed,
@@ -40,6 +44,7 @@ export class IdeHub {
   setSession(project: { root: string; files?: string[] } | null, tasks: TaskProgress[] = [], step: AnchoredStep | null = null): void {
     this.project = project?.root ? project : null
     this.tasks = tasks
+    this.lastRun = null
     this.setStep(step)
   }
 
@@ -58,12 +63,22 @@ export class IdeHub {
     this.changed()
   }
 
-  /** The editor's view for the coach's next request. */
+  /** The learner's last ▶ Run finished (or the session changed: null). Only the last one is kept. */
+  setLastRun(run: RunSummary | null): void {
+    this.lastRun = run
+  }
+
+  /** Open a file of the project in the editor ("Open in editor"): absolute path, line in the coach's view. */
+  open(file: string, line: number | null): void {
+    this.bridge.send({ type: 'open', file, line })
+  }
+
+  /** The editor's view, and the last run, for the coach's next request (added to the newest message only). */
   context(): string {
     if (!this.project) return ''
     const snap = this.bridge.snapshot()
     const f = snap ? this.feelingOf(snap) : undefined
-    return editorContext(this.project.root, this.project.files, snap, f)
+    return [editorContext(this.project.root, this.project.files, snap, f), runView(this.lastRun, this.now())].filter(Boolean).join('\n')
   }
 
   /** The linked editor's name, or null when none is connected. */
@@ -95,7 +110,8 @@ export class IdeHub {
       mood: rel ? f.mood : null,
       why: rel ? f.why : '',
       tasks: this.tasks,
-      stepDone: !!this.step && snap.stepsDone.has(this.step.id)
+      stepDone: !!this.step && snap.stepsDone.has(this.step.id),
+      typed: this.step && snap.stepTyped?.stepId === this.step.id ? snap.stepTyped.n : 0
     }
   }
 

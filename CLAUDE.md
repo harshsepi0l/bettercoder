@@ -1,6 +1,6 @@
 # BetterCoder
 
-A desktop app (Electron) that sits beside any IDE and **coaches** people to code: new, intermediate and senior. It **never writes their code**. It asks where they're heading, shows visuals, runs and animates their own code, maps their project and links official docs.
+A desktop app (Electron) that people write their code in (real VS Code in the Code tab, ▶ Run for every language) and that **coaches** them: new, intermediate and senior. It **never writes their code**. It asks where they're heading, shows visuals, runs and animates their own code, maps their project and links official docs.
 
 ## Hard rules
 
@@ -9,8 +9,8 @@ A desktop app (Electron) that sits beside any IDE and **coaches** people to code
   - Official doc examples: concept cards and Sources show a few lines of the official example, copied word for word (`engines/map/doc-examples.ts`). The app fetches them from an allowlist of official doc sites. They never come from the model, and the model never sees them.
   - Part labels (topics they're new to): the coach names parts it *expects* in a method's official line (`parts` on a `show_step` line, names or symbols only) with plain-word labels. The app finds them in the copied line (`shared/line-parts.ts`) and drops any that aren't there; the learner taps an underlined part to see its label.
   - Hidden examples: `animate_example` lets the coach write a small Python script that the animator runs (temp dir, same sandbox, works in idea sessions). Its code never leaves the main process: the trace goes out with `source: []`, `example: true`, and printed output or text values that look like code are refused. The player then shows only variables and output.
-- **The learner's project is read-only.** Never write inside it. Tools are sandboxed (`core/paths.ts` rules, `adapters/fs-readonly.ts` gate): no path escapes, secret files refused, secrets redacted. The animator runs on a **temp copy** under macOS `sandbox-exec` (no network, no writes outside temp).
-- **Licences.** Allowed libraries are MIT: pi-ai, pi-agent-core, pi-durable, chord.
+- **The learner writes; the coach never does.** The learner writes in the Code tab's VS Code; the app itself writes nothing into their project. What reaches VS Code (`adapters/code-server.ts`, `adapters/editor-import.ts`) is held by `ipc/vscode.ts` alone, and the coach and services have no way to write (`tests/architecture.test.ts` enforces both). The coach, its tools, the animator and the services stay read-only: tools are sandboxed (`core/paths.ts` rules, `adapters/fs-readonly.ts` gate): no path escapes, secret files refused, secrets redacted. The coach never types in a terminal and never sees VS Code's own terminals. Coach-started runs (animator, hidden examples) run on a **temp copy** under macOS `sandbox-exec` (no network, no writes outside temp); the learner's ▶ Run runs for real in their project.
+- **Licences.** Allowed libraries are MIT: pi-ai, pi-agent-core, pi-durable, chord, node-pty, and code-server (downloaded into `vendor/`, not bundled in git). VS Code extensions come from Open VSX only (Microsoft's marketplace is for Microsoft's VS Code).
 - **No word or regex routing of what the learner types.** Buttons send structured intents (`CoachIntent`). Typed text goes to the model as is. Use library mechanisms (pi-durable hooks, `configure({modelTools})`) instead.
 - **Sessions must never brick.** Recovery on open (`coach/coach.ts`); state is derived from the transcript (restart-safe).
 - Keys and sign-ins live in the OS keychain (`adapters/keychain.ts`, main process only). Anthropic *subscription* sign-in is blocked by their terms; API keys are fine.
@@ -32,7 +32,8 @@ A desktop app (Electron) that sits beside any IDE and **coaches** people to code
 npm run dev        # run the app (electron-vite)
 npm test           # tsx --test tests/*.test.ts (uses pi-ai's faux model, no network)
 npm run typecheck  # tsgo (TypeScript 7) for main+preload and renderer
-npm run ide:link   # dev install of the editor extension (symlinks ide/vscode into VS Code/Cursor/Windsurf), then restart the editor
+npm run vscode:fetch  # download code-server (pinned version, SHA-256 checked) into vendor/code-server: the Code tab's VS Code
+npm run vscode:ext -- <ids>  # install Open VSX extensions into the app's VS Code (no ids: list them); never run code-server without --config
 ```
 
 Before saying something is done: `npm test` and `npm run typecheck` must both pass.
@@ -57,14 +58,25 @@ src/
       paths.ts            isSecretPath, redactSecrets, SandboxError
       feeling.ts          stuck / ok / flowing from editor activity
       text-view.ts        notebook ↔ python views, line mapping
-      editor-url.ts       vscode:// (cursor://, …) links for "Open in editor"
-    ports/                interfaces only: ProjectFiles, Animator, CodeMapper, ProjectScanner, SessionStore, EditorFeed
+      traceback.ts        Python tracebacks: error type/message, frames, the learner's line to underline
+      run-errors.ts       errors from every language ▶ Run handles (Node, .NET, Java, Kotlin, Swift, clang, crashes)
+      error-words.ts      the plain-words line for a run's error (fixed templates, never the model, never code)
+      runners.ts          ▶ Run: the command for each language, what it needs, official install links
+      ai-extensions.ts    which editor extensions and settings are AI (same rule as ide/vscode/ai-block.js)
+      editor-import.ts    "Bring your VS Code": what comes over, swaps, FORCED_SETTINGS (no AI, names-only autocomplete)
+      jsonc.ts            VS Code's commented JSON
+    ports/                interfaces only: ProjectFiles, Animator, CodeMapper, ProjectScanner, SessionStore, EditorFeed, Terminals
     adapters/             the outside world (implements ports)
-      fs-readonly.ts      resolveInside: the gate for every path into the learner's project
+      fs-readonly.ts      resolveInside: the gate for every path the coach reads in the learner's project
       providers.ts        pi-ai providers (all 42), settings.json (model, profile, skills)
       keychain.ts         keychain store (async safeStorage) over credential-store.ts (the encrypted file, testable)
       store.ts            projects + sessions (JSON + SQLite in userData)
-      ide-socket.ts       editor link socket (~/.bettercoder/ide.sock)
+      ide-socket.ts       the link to the BetterCoder extension in VS Code (~/.bettercoder/ide.sock); run commands → ipc
+      editor-snapshot.ts  editor messages → EditorSnapshot (strict parsing)
+      code-server.ts      the Code tab's VS Code: start/stop, secret cookie, stable port, forced settings, AI removal, installs
+      editor-import.ts    "Bring your VS Code": reads VS Code/Cursor/Windsurf/VSCodium setups, checks Open VSX, copies over
+      toolchain.ts        which compilers/runtimes are really installed (past macOS stand-ins), project files, temp build dir
+      pty.ts              node-pty terminals for ▶ Run
     engines/              work the coach and tabs use (implements ports)
       project.ts          detectProject / detectFiles (any folder; git optional), SKIP_DIRS
       map/                code map: python-analyzer (ast), ts-analyzer (ts5), curly-analyzer (Java/C#/…), build-map, docs, doc-examples, code-skills
@@ -81,17 +93,21 @@ src/
       editor-link.ts      ties the editor to the open session: marker, meters, status line
       editor-context.ts   what the coach sees of the editor
     ipc/                  index.ts builds everything; ports.ts plugs the real ports in (realPorts, also used by tests);
-                          one file per area (coach, workspace, editor, visualize, map, settings)
-  preload/                exposes window.bettercoder / workspace / harness / visualize / codeMap
-  shared/                 types and IPC channel names shared by main and renderer (profile.ts, harness.ts, workspace.ts, …)
+                          one file per area (coach, workspace, editor, code, vscode, visualize, map, settings); vscode.ts is the
+                          Code tab's VS Code and the import; code.ts + code-area.ts + editor-runs.ts are ▶ Run
+  preload/                exposes window.bettercoder / workspace / harness / visualize / codeMap / code / ide / editorImport
+  shared/                 types and IPC channel names shared by main and renderer (profile.ts, harness.ts, workspace.ts, code.ts, ide.ts, editor-import.ts, …)
   renderer/src/
     app.tsx               shell: onboarding → Home or session; sidebar toggle (⌘B)
     features/
-      profile/            onboarding (style → code view → connect), profile editors, skills view, code view picker
+      profile/            onboarding (style → code view → your editor → connect), profile editors, skills view, code view picker, editor-import
       home/               Home: open folder/files, start from an idea, recent sessions
-      shell/              title bar, sidebar + rail, session bar, tabs, composer
-      coach/ visualize/ map/ sources/ settings/ workspace/ project/
-ide/vscode/               the editor extension (plain CommonJS, no build): extension.js, ghost.js (pure, tested)
+      shell/              title bar, sidebar + rail, session bar, tabs (layoutSections), composer
+      code/               the Code tab: vscode-frame.tsx (VS Code in a frame, "Pick a folder" for ideas)
+      coach/              coach-pane.tsx (the coach beside the editor: meters row + one chat), chat, cards, meters
+      visualize/ map/ sources/ settings/ workspace/ project/
+ide/vscode/               the BetterCoder extension inside VS Code (plain CommonJS, no build): extension.js, ghost.js, notebook-view.js,
+                          ai-block.js (pure, tested), themes/bettercoder-dark.json
 tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 ```
 
@@ -122,13 +138,26 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 - Hidden harness messages start with `[BetterCoder` and are never shown.
 - `entries({ order: 'ascending' })`. There is no delete-conversation API; delete the session's SQLite files instead.
 
-## Editor link notes
+## Code tab (VS Code) notes
 
-- BetterCoder and the editor are two apps side by side. The extension (`ide/vscode`) talks to the app over a Unix socket in `~/.bettercoder` (folder 0700), one JSON message per line (`shared/ide.ts`).
-- The editor sends: hello, editor (file, cursor), doc (text), diagnostics, step_done. The app sends: anchor, clear, status.
-- The coach sees the editor through `services/editor-context.ts`. It is added to the newest learner message on each request and **never stored**. The same rules as the tools apply: project files only, no secret files, secrets redacted.
+- The Code tab is code-server (open-source VS Code, `vendor/code-server`), one server for the app on 127.0.0.1, opened on the session's project folder in a frame. A session is the Code tab (and Visualize, Map, Sources) on the left, the coach pane on the right; narrow windows fall back to tabs. Idea projects show "Pick a folder".
+- Locked: each start makes a random secret passed as code-server's `HASHED_PASSWORD`; the app adds the matching `code-server-session` cookie to its own requests to that port only (`ipc/vscode.ts`). Anything else gets the login page.
+- Its data lives in `userData/vscode` (settings, extensions, `config.yaml`, `port.json`). The port is reused, because VS Code keeps window state in browser storage per address. code-server must always get `--config`, or it writes `~/.config/code-server`.
+- Every start: `FORCED_SETTINGS` go back on (no AI, inline suggestions/inlay hints/snippets/tab completion off, the app's layout), AI extensions are removed (`core/ai-extensions.ts`: known list, AI/Chat category, own language models, inline-completion proposals; hooks for *other* AIs like `languageModelTools` are not AI), other extensions' title-bar Run buttons are hidden (`HIDDEN_RUN_BUTTONS`), and our extension is registered in `extensions.json` (a folder only linked in is "marked as removed").
+- "Bring your VS Code" (onboarding step, Settings › Editor): settings (minus AI, secrets, managed keys), keybindings (minus AI commands), snippets, and extensions from Open VSX; Microsoft-only ones are swapped (`SWAPS`: Pylance → basedpyright, C# Dev Kit → muhammad-sammy.csharp, cpptools → clangd). A theme whose extension can't come stays BetterCoder Dark.
+- The extension (`ide/vscode`) only connects when `BETTERCODER_EMBEDDED=1` (set by the app); installed in someone's own VS Code it does nothing. Inside, it also uninstalls an AI extension the moment it appears and puts locked settings back.
+- It talks to the app over a Unix socket in `~/.bettercoder` (folder 0700), one JSON message per line (`shared/ide.ts`). VS Code sends: hello, editor (file, cursor), doc (text), diagnostics, step_done, step_typed, and ▶ Run's run / term_input / term_resize / term_stop. The app sends: anchor, clear, status, open ("Open in editor"; held until VS Code connects), term (run output and end), run_error (with an install link), problems.
+- Notebooks are reported in the coach's own view (`ide/vscode/notebook-view.js`, kept identical to `core/text-view.ts` by a test): editor lines, markers and "Open in editor" lines are view lines, mapped to cells by the extension.
+- The coach sees the editor through `services/editor-context.ts`, added to the newest learner message on each request and **never stored**. Same rules as the tools: project files only, no secret files, secrets redacted.
 - `show_step` takes `at` (file, line). The editor marks that line and shows the step's pseudocode as an `after` decoration, one line at a time (`ghost.js`). It is never inline-completion ghost text, because Tab would write it into their file.
 - Meters: progress comes from `track_progress` (stored, so it is rebuilt from the transcript). Feeling comes from editor activity only (`core/feeling.ts`), never from what the learner types. Stuck shows "Get a hint" and a typed-out step shows "Next step"; both send existing intents.
+
+## ▶ Run notes
+
+- Pressed in VS Code (title-bar ▶, ⌘Enter): the app runs the file in its own pty (`services/terminals.ts`) and streams it into VS Code's "▶ Run" terminal (`ipc/editor-runs.ts`), which takes the learner's keystrokes, so `input()` works. Notebooks use VS Code's own Run All.
+- Commands per language: `core/runners.ts` (Python with the project's venv; Node, incl. TypeScript on Node 22+; C# via the nearest `.csproj`, or .NET 10 for one file; Java; Kotlin; Swift, or `swift run` for a package; C/C++ with clang). Builds go to a temp folder (`--artifacts-path`, `--scratch-path`, `-o`), never into the project. A missing tool gives its official install page.
+- Output, the plain-words line (`core/error-words.ts`) and underlines (`core/run-errors.ts`) come from the run, never the model. The coach sees only the last run (`core/run-view.ts`, newest message, never stored).
+- node-pty is N-API (works under Node and Electron with no rebuild); `scripts/fix-node-pty.mjs` makes its `spawn-helper` executable after install.
 
 ## Animator notes
 

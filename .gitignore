@@ -7,3 +7,4 @@ dist
 clean-architecture/
 .env
 .env.*
+vendor/

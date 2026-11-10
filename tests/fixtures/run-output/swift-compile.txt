@@ -1,0 +1,5 @@
+undef.swift:2:7: error: cannot find 'total' in scope
+1 | let xs = [1, 2]
+2 | print(total)
+  |       `- error: cannot find 'total' in scope
+3 | 

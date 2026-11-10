@@ -100,10 +100,57 @@ test('architecture: coach and services use ports only (no adapters, engines, fil
   assert.deepEqual(wrong, [], 'use a port (src/main/ports) instead')
 })
 
+/**
+ * The learner writes, the coach never does (CLAUDE.md hard rule). The learner writes in the Code tab's VS Code; the app
+ * itself writes nothing into their project. What reaches VS Code (its server, which runs it and installs into it, and
+ * "Bring your VS Code") is held by ipc/vscode.ts alone: no coach, tool or service can reach it.
+ */
+test('architecture: only the VS Code IPC can reach VS Code and the editor import', () => {
+  const guarded: Record<string, Set<string>> = {
+    'adapters/code-server.ts': new Set(['ipc/vscode.ts', 'adapters/editor-import.ts']),
+    'adapters/editor-import.ts': new Set(['ipc/vscode.ts'])
+  }
+  const wrong: string[] = []
+  for (const file of walk(MAIN)) {
+    const rel = relative(MAIN, file)
+    for (const m of readFileSync(file, 'utf8').matchAll(/(?:from|import)\s*\(?\s*'(\.{1,2}\/[^']+)'/g)) {
+      const t = target(file, m[1])
+      const to = t ? relative(MAIN, t) : ''
+      if (guarded[to] && !guarded[to].has(rel)) wrong.push(`${rel} → ${to}`)
+    }
+  }
+  assert.deepEqual(wrong, [], 'only ipc/vscode.ts may reach VS Code')
+})
+
+test('architecture: the coach and the services have no way to write or to type in a terminal', () => {
+  const wrong: string[] = []
+  for (const area of ['coach', 'services']) {
+    for (const file of walk(join(MAIN, area))) {
+      if (/\b(writeFile|appendFile|createWriteStream|code-server|editor-import)\b/.test(readFileSync(file, 'utf8'))) wrong.push(relative(MAIN, file))
+    }
+  }
+  assert.deepEqual(wrong, [], 'the coach never writes')
+  const ports = readFileSync(join(MAIN, 'ports', 'index.ts'), 'utf8')
+  const coachPorts = /export interface CoachPorts \{[^}]*\}/.exec(ports)?.[0]
+  assert.ok(coachPorts, 'CoachPorts is declared in ports/index.ts')
+  assert.doesNotMatch(coachPorts, /Writer|write|Terminals/i, 'CoachPorts must not include a way to write or type')
+})
+
 test('architecture: ports hold interfaces only', () => {
   for (const file of walk(join(MAIN, 'ports'))) {
     const src = readFileSync(file, 'utf8')
     assert.doesNotMatch(src, /^\s*(export\s+)?(const|let|function|class)\s/m, `${relative(MAIN, file)} must hold types only`)
     assert.doesNotMatch(src, /^import (?!type )/m, `${relative(MAIN, file)} may only import types`)
   }
+})
+
+/**
+ * Regression (2026-11-07, the coach pane beside the editor): Radix ScrollArea wraps its content in a `display: table`
+ * box that grows to the widest line, so a "your code" card with long lines pushed the whole chat past the right edge
+ * of the window. The shared ScrollArea keeps that box a block, so wide content scrolls inside its card.
+ */
+test('renderer: the scroll area keeps its content to its own width', () => {
+  const src = readFileSync(join(import.meta.dirname, '..', 'src', 'renderer', 'src', 'components', 'ui', 'scroll-area.tsx'), 'utf8')
+  const viewport = /<ScrollAreaPrimitive\.Viewport[\s\S]*?className="([^"]*)"/.exec(src)?.[1] ?? ''
+  assert.match(viewport, /\[&>div\]:!block/, 'the viewport content must not be display: table')
 })
