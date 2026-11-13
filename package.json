@@ -18,7 +18,8 @@
     "test": "tsx --test tests/*.test.ts",
     "postinstall": "node scripts/fix-node-pty.mjs && node scripts/copy-excalidraw-fonts.mjs",
     "vscode:fetch": "node scripts/fetch-code-server.mjs",
-    "vscode:ext": "node scripts/vscode-ext.mjs"
+    "vscode:ext": "node scripts/vscode-ext.mjs",
+    "check:session": "electron scripts/session-check/electron.mjs"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

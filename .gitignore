@@ -9,3 +9,4 @@ clean-architecture/
 .env.*
 vendor/
 src/renderer/public/fonts/
+.session-check/
