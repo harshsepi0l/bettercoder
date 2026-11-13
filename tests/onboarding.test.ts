@@ -142,7 +142,7 @@ test('the coach for an idea offers only cards (and note_skill), and new evidence
   profile = { ...profile, skills: [{ language: 'general', topic: 'web apps', level: 'pro', evidence: 'has shipped sites before', by: 'coach', at: 1 }] }
   await coach.send('In a web browser')
   await coach.waitForIdle()
-  assert.deepEqual(offered(seen[0]), ['animate_example', 'ask_question', 'note_skill', 'show_diagram', 'show_step'])
+  assert.deepEqual(offered(seen[0]), ['ask_question', 'draw_board', 'note_skill', 'show_diagram', 'show_step'])
   // Levels ride on the newest message (not the cached section), so the next request sees new evidence.
   const newest = (ctx: unknown) => JSON.stringify((ctx as { messages: Array<{ role: string }> }).messages.findLast((m) => m.role === 'user'))
   assert.match(newest(seen[0]), /Nothing seen yet/)

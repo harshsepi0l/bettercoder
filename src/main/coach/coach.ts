@@ -27,11 +27,10 @@ import { redactSecrets } from '../core/paths'
 import { createTools } from './tools/read'
 import { VISUAL_TOOL_NAMES, createVisualTools } from './tools/cards'
 import { createSkillTool } from './tools/skill'
-import { createProgressTool, progressFromEntries } from './tools/progress'
+import { createTaskTool, type SetTask } from './tools/tasks'
 import type { Skill } from '../../shared/profile'
-import type { TaskProgress } from '../../shared/ide'
 import { MAX_REWRITES, MAX_TOOL_CALLS_PER_MESSAGE, MAX_TOOL_RESULT_CHARS, HIDDEN_PREFIX, READ_TOOLS, withIntent, stripIntent, type TurnState, turnState, textOf, MAX_TOOL_RETRIES, typedToolName, withoutToolNames, hasCode, asksQuestion } from './turn'
-import { describeTool, isToolLine, itemsFromEntries, sumUsage, type AnchoredStep, anchoredStep, lastStepFromEntries } from './replay'
+import { describeTool, isToolLine, itemsFromEntries, sumUsage, type AnchoredStep, anchoredStep, lastStepFromEntries, legacyTaskTitles } from './replay'
 import { prepareMessages, cacheSettings } from './request'
 
 /**
@@ -82,8 +81,10 @@ export interface CoachDeps {
   editorContext?: () => string
   /** A step card was shown: where to write it (null when the step has no place), for their editor. */
   onStep?: (step: AnchoredStep | null) => void
-  /** The coach updated the progress meter. */
-  onProgress?: (tasks: TaskProgress[]) => void
+  /** The coach added a task or wrote one's check (set_task); throws when it can't be saved. */
+  setTask?: SetTask
+  /** The session's tasks as the coach sees them (never the answers); empty when there are none. */
+  tasksContext?: () => string
 }
 
 /** The project's languages, most files first ("C#", "Python"); none for an idea without a folder. */
@@ -93,12 +94,12 @@ export function projectLanguages(project: ProjectInfo): string[] {
 }
 
 /** Cards that need no files: all a coach has before a project folder is linked. */
-const IDEA_TOOLS = new Set(['ask_question', 'show_diagram', 'show_step', 'animate_example'])
+const IDEA_TOOLS = new Set(['ask_question', 'show_diagram', 'show_step', 'draw_board'])
 
 export class Coach {
   private stream: AgentEventStream | null = null
   /** Per-request state, recomputed from the transcript before every model request (restart-safe). */
-  private state: TurnState = { intent: null, rewrites: 0, toolRetries: 0, readCalls: 0, animated: false, asked: false, nudged: false }
+  private state: TurnState = { intent: null, rewrites: 0, toolRetries: 0, readCalls: 0, drew: false, asked: false, nudged: false }
   /** Read calls made inside the current round, on top of state.readCalls. */
   private roundReads = 0
   /** The current round includes ask_question, so every call in it ends the turn (pi-durable needs all of them to). */
@@ -116,11 +117,11 @@ export class Coach {
     private readonly emit: (e: HarnessEvent) => void,
     private readonly deps: CoachDeps,
     private readonly durableTools: ReturnType<typeof toDurable>[],
-    private readonly hasPython: boolean,
     readonly initialItems: ChatItem[],
     readonly initialUsage: TurnUsage | null,
-    readonly initialProgress: TaskProgress[],
-    readonly initialStep: AnchoredStep | null
+    readonly initialStep: AnchoredStep | null,
+    /** Tasks from the old progress meter in this transcript (see legacyTaskTitles). */
+    readonly legacyTasks: string[]
   ) {}
 
   /** Open (or create) a session's coach on its SQLite file, recovering and resuming any unfinished work. */
@@ -132,11 +133,6 @@ export class Coach {
   ): Promise<Coach> {
     // An idea with no folder yet: no file tools at all (an empty root must never reach the sandbox).
     const idea = !project.root
-    const hasPython = idea
-      ? false
-      : project.files
-        ? project.files.some((f) => /\.(py|ipynb)$/i.test(f))
-        : project.languages.some((l) => l.name === 'Python') || project.stacks.includes('Python')
     const languages = projectLanguages(project)
     const skillTool = createSkillTool(languages[0] ?? 'general', (s) => deps.noteSkill?.(s))
     const agentTools = idea
@@ -144,10 +140,12 @@ export class Coach {
       : [
           createOutlineTool(project, deps.ports.mapper),
           ...createTools(deps.ports.files, project.root, project.files),
-          // The animator runs only Python: offering it elsewhere invites calls that can only fail.
-          ...createVisualTools(deps.ports, project.root, project.files).filter((t) => hasPython || t.name !== 'animate_code'),
+          ...createVisualTools(deps.ports, project.root, project.files),
           skillTool,
-          createProgressTool((tasks) => deps.onProgress?.(tasks))
+          createTaskTool((task) => {
+            if (!deps.setTask) throw new Error('Tasks are not available here.')
+            return deps.setTask(task)
+          })
         ]
     const durableTools = agentTools.map(toDurable)
     const toolNames = new Set(agentTools.map((t) => t.name))
@@ -157,7 +155,7 @@ export class Coach {
     const extension = defineExtension({
       name: 'bettercoder',
       sections: [
-        section('coach', () => coachPrompt(project, hasPython), { tag: false }),
+        section('coach', () => coachPrompt(project), { tag: false }),
         section('learner', () => learnerPrompt(deps.profile?.() ?? DEFAULT_PROFILE), { tag: false })
       ],
       tools: durableTools,
@@ -169,8 +167,8 @@ export class Coach {
               box.coach.roundReads = 0
             }
             // Everything that changes turn to turn rides on the newest message, so the start of the request stays cached.
-            const now = [learnerNow(deps.profile?.() ?? DEFAULT_PROFILE, languages, deps.cardUse?.() ?? ''), idea ? '' : (deps.editorContext?.() ?? '')]
-            return { messages: prepareMessages(request.messages, hasPython, idea, now.filter(Boolean).join('\n\n')) }
+            const now = [learnerNow(deps.profile?.() ?? DEFAULT_PROFILE, languages, deps.cardUse?.() ?? ''), idea ? '' : (deps.editorContext?.() ?? ''), idea ? '' : (deps.tasksContext?.() ?? '')]
+            return { messages: prepareMessages(request.messages, idea, now.filter(Boolean).join('\n\n')) }
           },
           afterResponse: (message: AssistantMessage) => {
             if (box.coach) box.coach.roundAsks = asksQuestion(message)
@@ -183,7 +181,7 @@ export class Coach {
               return t.rewrites < MAX_REWRITES ? { continue: REWRITE_REQUEST } : undefined
             }
             if (typedToolName(answer) && t.toolRetries < MAX_TOOL_RETRIES) return { continue: TOOL_TEXT_REQUEST }
-            if (t.intent === 'visualize' && hasPython && !t.animated && !t.asked && !t.nudged) {
+            if (t.intent === 'visualize' && !t.drew && !t.asked && !t.nudged) {
               return { continue: VISUALIZE_NUDGE }
             }
             return undefined
@@ -239,11 +237,10 @@ export class Coach {
       emit,
       deps,
       durableTools,
-      hasPython,
       itemsFromEntries(entries),
       usage.total > 0 ? usage : null,
-      progressFromEntries(entries),
-      lastStepFromEntries(entries)
+      lastStepFromEntries(entries),
+      idea ? [] : legacyTaskTitles(entries)
     )
     box.coach = coach
     // A round interrupted by a restart resumes its tools: it still waits for the learner if it asked a question.
@@ -296,9 +293,8 @@ export class Coach {
       await this.root.configure({ model: { provider: model.provider, modelId: model.id }, thinkingLevel: 'off' } as never, ctx)
     }
     if (!this.busy) {
-      // Visualize offers only reading, asking and the animator (pi-durable's modelTools); everything else gets all tools.
-      const visual = this.hasPython ? 'animate_code' : 'show_diagram'
-      const allowed = new Set([...READ_TOOLS, 'ask_question', visual, 'animate_example'])
+      // Visualize offers only reading, asking and the whiteboard (pi-durable's modelTools); everything else gets all tools.
+      const allowed = new Set([...READ_TOOLS, 'project_outline', 'ask_question', 'draw_board'])
       const restrict = intent === 'visualize'
       if (restrict || this.toolsRestricted) {
         await this.root.configure({ modelTools: restrict ? this.durableTools.filter((t) => allowed.has(t.name)) : null } as never, ctx)

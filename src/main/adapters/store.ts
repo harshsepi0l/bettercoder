@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, readdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { projectKind, type ProjectSummary, type SessionSummary } from '../../shared/workspace'
-import type { ProjectRecord, SessionRecord, SessionStore } from '../ports'
+import type { ProjectRecord, SessionRecord, SessionStore, StoredTask } from '../ports'
 
 /**
  * BetterCoder's own records, stored as JSON in the app's data folder (never in
@@ -11,6 +11,7 @@ import type { ProjectRecord, SessionRecord, SessionStore } from '../ports'
  *   <dataDir>/projects/<projectId>/project.json
  *   <dataDir>/projects/<projectId>/sessions/<sessionId>.json     title, timestamps
  *   <dataDir>/projects/<projectId>/sessions/<sessionId>.sqlite   the conversation (pi-durable)
+ *   <dataDir>/projects/<projectId>/sessions/<sessionId>.tasks    its tasks (JSON)
  *
  * The Map is read from the code on demand; nothing project-level is stored yet.
  */
@@ -129,11 +130,26 @@ export class WorkspaceStore implements SessionStore {
     return join(this.sessionsDir(record.projectId), `${record.id}.sqlite`)
   }
 
+  /** Kept beside the session (not `.json`, so listing sessions never reads it as one). */
+  private tasksFile(record: Pick<SessionRecord, 'id' | 'projectId'>): string {
+    return join(this.sessionsDir(record.projectId), `${record.id}.tasks`)
+  }
+
+  async loadTasks(record: Pick<SessionRecord, 'id' | 'projectId'>): Promise<StoredTask[] | null> {
+    const tasks = await readJson<StoredTask[]>(this.tasksFile(record))
+    return Array.isArray(tasks) ? tasks.filter((t) => t && typeof t.id === 'string' && typeof t.title === 'string') : null
+  }
+
+  async saveTasks(record: Pick<SessionRecord, 'id' | 'projectId'>, tasks: readonly StoredTask[]): Promise<void> {
+    await mkdir(this.sessionsDir(record.projectId), { recursive: true })
+    await writeJson(this.tasksFile(record), tasks)
+  }
+
   async deleteSession(sessionId: string): Promise<void> {
     const s = await this.getSession(sessionId)
     if (!s) return
     const base = join(this.sessionsDir(s.projectId), s.id)
-    for (const suffix of ['.json', '.sqlite', '.sqlite-wal', '.sqlite-shm']) await rm(`${base}${suffix}`, { force: true })
+    for (const suffix of ['.json', '.tasks', '.sqlite', '.sqlite-wal', '.sqlite-shm']) await rm(`${base}${suffix}`, { force: true })
   }
 
   /** Remove BetterCoder's own records for a project. The project's folder on disk is never touched. */

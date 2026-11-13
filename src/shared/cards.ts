@@ -1,4 +1,4 @@
-import type { Trace } from './trace'
+import type { Board } from './board'
 import type { SkillLevel } from './profile'
 import type { LinePart } from './line-parts'
 
@@ -53,11 +53,13 @@ export type Card =
       idea?: { term: string; explanation: string; docTitle?: string; docUrl?: string; level?: SkillLevel }
       lines: StepLine[]
       question?: { question: string; options: string[]; allowOther: boolean }
-      /** Where in their file to write it (relative path, 1-based line): their editor marks it and shows the lines faded. */
+      /** Where in their file to write it (relative path, 1-based line): their editor labels it, with the official line of each tagged line. */
       anchor?: { path: string; line: number }
     }
-  /** A real, recorded run of the learner's own code, to play step by step. */
-  | { kind: 'animation'; title: string; note: string; trace: Trace }
+  /** The whiteboard: the coach draws an idea in steps; the learner plays or steps through it. */
+  | { kind: 'board'; title: string; note: string; board: Board }
+  /** From the old animator (removed): kept so past sessions still open; shown as one line. */
+  | { kind: 'animation'; title: string; note: string }
 
 export type CardKind = Card['kind']
 

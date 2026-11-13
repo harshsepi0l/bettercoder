@@ -24,6 +24,8 @@ app.setName('BetterCoder')
 }
 
 const TOGGLE_SHORTCUT = 'Alt+Space'
+/** The whole window (VS Code's frame too) a little smaller than 100%, for more room. ⌘+ / ⌘− still change it. */
+const ZOOM = 0.9
 let win: BrowserWindow | null = null
 function createWindow(): void {
   const isMac = process.platform === 'darwin'
@@ -43,7 +45,8 @@ function createWindow(): void {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      zoomFactor: ZOOM
     }
   })
 

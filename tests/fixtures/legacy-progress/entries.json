@@ -1,0 +1,75 @@
+[
+ {
+  "kind": "pi.tool-result",
+  "model": [
+   {
+    "role": "toolResult",
+    "toolName": "track_progress",
+    "content": [
+     {
+      "type": "text",
+      "text": "Noted."
+     }
+    ],
+    "details": {
+     "tasks": [
+      {
+       "title": "An older list",
+       "percent": 0
+      }
+     ]
+    },
+    "isError": false
+   }
+  ]
+ },
+ {
+  "model": [
+   {
+    "role": "toolResult",
+    "toolCallId": "call-025d6695-342b-4024-b129-17db0ffcc223-3|fc_ed09965f-28b7-9eaa-a6ae-7db90e57ae47_0",
+    "toolName": "track_progress",
+    "content": [
+     {
+      "type": "text",
+      "text": "Noted."
+     }
+    ],
+    "details": {
+     "tasks": [
+      {
+       "title": "Read two numbers",
+       "percent": 100
+      },
+      {
+       "title": "Pick and run operation",
+       "percent": 100
+      },
+      {
+       "title": "Print the result",
+       "percent": 90
+      },
+      {
+       "title": "Handle bad input",
+       "percent": 0
+      },
+      {
+       "title": "Guard divide by zero",
+       "percent": 0
+      }
+     ]
+    },
+    "isError": false,
+    "durationMs": 0,
+    "timestamp": 1794266845427
+   }
+  ],
+  "data": {
+   "diagnostics": []
+  },
+  "kind": "pi.tool-result",
+  "id": 24,
+  "conversationId": 1,
+  "byTaskId": 22
+ }
+]

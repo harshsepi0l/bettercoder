@@ -85,21 +85,20 @@ export function coachTurns(items: readonly { kind: string }[]): Array<{ from: nu
   return out
 }
 
-/** A chat item that is an animation card: the one rule for "this session has an animation". */
-export function isAnimationCard(item: ChatItem): item is { kind: 'card'; id: string; card: Extract<Card, { kind: 'animation' }> } {
-  return item.kind === 'card' && item.card.kind === 'animation'
+/** A chat item that is a whiteboard card. */
+export function isBoardCard(item: ChatItem): item is { kind: 'card'; id: string; card: Extract<Card, { kind: 'board' }> } {
+  return item.kind === 'card' && item.card.kind === 'board'
 }
 
-/** Every animation the coach showed in this session, oldest first, for the Visualize tab. */
-export function animationsFromChat(items: readonly ChatItem[]): Array<{ id: string; card: Extract<Card, { kind: 'animation' }> }> {
-  return items.filter(isAnimationCard).map((item) => ({ id: item.id, card: item.card }))
+/** Every whiteboard the coach drew in this session, oldest first, for the Visualize tab. */
+export function boardsFromChat(items: readonly ChatItem[]): Array<{ id: string; card: Extract<Card, { kind: 'board' }> }> {
+  return items.filter(isBoardCard).map((item) => ({ id: item.id, card: item.card }))
 }
 
 /**
- * Tabs locked for a session: an idea has no folder, so no Map; Visualize opens once the coach has shown an animation
- * (regression: it stayed greyed out, hiding the session's example animations).
+ * Tabs locked for a session: an idea has no folder, so no Map and no Tasks (a check needs a ▶ Run). The whiteboard
+ * needs no files, so Visualize is always open.
  */
-export function lockedSections(isIdea: boolean, items: readonly ChatItem[]): Array<'visualize' | 'map'> {
-  if (!isIdea) return []
-  return items.some(isAnimationCard) ? ['map'] : ['visualize', 'map']
+export function lockedSections(isIdea: boolean): Array<'map' | 'tasks'> {
+  return isIdea ? ['map', 'tasks'] : []
 }

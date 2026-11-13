@@ -7,6 +7,7 @@ import { EmptyState } from '@/features/shell/empty-state'
 import { ChatView } from '@/features/coach/chat-view'
 import type { Coach } from '@/features/coach/use-coach'
 import { IdeMeter } from '@/features/coach/ide-meter'
+import { TaskToasts } from '@/features/tasks/tasks-tab'
 
 export function CoachTab({
   project,
@@ -15,7 +16,8 @@ export function CoachTab({
   hasModel,
   onOpenSettings,
   inPane = false,
-  typed
+  typed,
+  onViewTasks
 }: {
   project: ProjectInfo | null
   onOpenProject: () => void
@@ -26,6 +28,8 @@ export function CoachTab({
   inPane?: boolean
   /** The newest step card and how many of its lines they have written. */
   typed?: { id: string; n: number }
+  /** Open the Tasks tab (from a task notification; narrow windows, where the coach is a tab). */
+  onViewTasks?: () => void
 }) {
   if (!project) {
     return (
@@ -46,37 +50,40 @@ export function CoachTab({
   }
 
   return (
-    <>
+    <div className="flex min-h-0 flex-1 flex-col">
       {project.root && !inPane && <IdeMeter busy={coach.busy} onSend={coach.send} />}
-      <ScrollArea className="min-h-0 flex-1">
-        <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-3.5">
-          {coach.items.length === 0 && project.root ? <ProjectCard project={project} /> : <ProjectLine project={project} />}
-          {coach.items.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-6 text-center">
-              <MessageSquare className="size-5 text-muted-foreground" aria-hidden="true" />
-              {hasModel ? (
-                <p className="max-w-[300px] text-[13px] leading-relaxed text-muted-foreground">
-                  Ask about your project, or tell the coach where you're stuck. It can read your files, but it will never
-                  write code for you.
-                </p>
-              ) : (
-                <>
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {project.root && !inPane && onViewTasks && <TaskToasts onView={onViewTasks} />}
+        <ScrollArea className="min-h-0 flex-1">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-3.5">
+            {coach.items.length === 0 && project.root ? <ProjectCard project={project} /> : <ProjectLine project={project} />}
+            {coach.items.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <MessageSquare className="size-5 text-muted-foreground" aria-hidden="true" />
+                {hasModel ? (
                   <p className="max-w-[300px] text-[13px] leading-relaxed text-muted-foreground">
-                    Connect a model to start: sign in with Grok, or add an API key.
+                    Ask about your project, or tell the coach where you're stuck. It can read your files, but it will never
+                    write code for you.
                   </p>
-                  <Button size="sm" onClick={onOpenSettings}>
-                    <Settings />
-                    Open settings
-                  </Button>
-                </>
-            )}
+                ) : (
+                  <>
+                    <p className="max-w-[300px] text-[13px] leading-relaxed text-muted-foreground">
+                      Connect a model to start: sign in with Grok, or add an API key.
+                    </p>
+                    <Button size="sm" onClick={onOpenSettings}>
+                      <Settings />
+                      Open settings
+                    </Button>
+                  </>
+              )}
+            </div>
+          ) : (
+            <ChatView items={coach.items} busy={coach.busy} onAnswer={coach.send} typed={typed} />
+          )}
           </div>
-        ) : (
-          <ChatView items={coach.items} busy={coach.busy} onAnswer={coach.send} typed={typed} />
-        )}
+        </ScrollArea>
       </div>
-    </ScrollArea>
-    </>
+    </div>
   )
 }
 

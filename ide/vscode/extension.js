@@ -5,9 +5,10 @@
  *
  * Tells the BetterCoder app which file is open, where the cursor is, the text and the problems. Notebooks are
  * reported in the coach's own view of them (notebook-view.js): a header per cell, its source and short outputs, with
- * the same line numbers the coach's tools use. Shows what the app sends back: a marker on the line where the step
- * goes (in a notebook, on the right cell), the step's pseudocode faded beside the cursor, one line at a time, and a
- * status line. Decorations only: nothing is ever written into the learner's files, and Tab never accepts anything.
+ * the same line numbers the coach's tools use. Shows what the app sends back: a label above the line where the step
+ * goes (in a notebook, in the right cell) with "See the official line", which opens the method's official example
+ * (copied word for word from the docs by the app) inline under that line, read-only; and a status line. Nothing is
+ * ever written into the learner's files, and Tab never accepts anything.
  *
  * ▶ Run (the learner's button, in the editor's title bar): the app runs the file in its own terminal, so the coach
  * sees the last run and errors get their plain-words line; it streams back into a "▶ Run" terminal here, which takes
@@ -34,14 +35,19 @@ let socket = null
 let buffer = ''
 let retry = null
 let disposed = false
-/** @type {{ stepId: string, file: string, line: number, ghost: string[] } | null} */
+/** @type {{ stepId: string, file: string, line: number, title: string, ghost: string[], official: Array<{ method: string, docUrl: string } | null> } | null} */
 let anchor = null
 let doneSent = null
 /** The last lines-typed count sent, as "stepId:n". */
 let typedSent = null
 let status
-let markerType
-let ghostType
+/** Which pseudocode line of the step they are on (lines typed so far), for the label's official line. */
+let stepIndex = 0
+/** The label above the step changes (another step, or they moved on a line). */
+const lensChanged = new vscode.EventEmitter()
+/** The official examples opened under a step, by their read-only document's address. */
+const officialDocs = new Map()
+const OFFICIAL_SCHEME = 'bettercoder-official'
 let runProblems
 /** The "▶ Run" terminal of the latest run: { id, file, done, terminal, write }. */
 let runTerm = null
@@ -219,13 +225,21 @@ function receive(m) {
   if (!m || typeof m !== 'object') return
   if (m.type === 'anchor' && typeof m.file === 'string' && Number.isInteger(m.line) && Array.isArray(m.ghost)) {
     const isNew = !anchor || anchor.stepId !== m.stepId
-    anchor = { stepId: String(m.stepId), file: m.file, line: m.line, ghost: m.ghost.map(String).slice(0, 12) }
-    if (isNew) doneSent = null
+    const official = Array.isArray(m.official) ? m.official.slice(0, 12).map(officialOf) : []
+    anchor = { stepId: String(m.stepId), file: m.file, line: m.line, title: typeof m.title === 'string' ? m.title.slice(0, 80) : '', ghost: m.ghost.map(String).slice(0, 12), official }
+    if (isNew) {
+      doneSent = null
+      stepIndex = 0
+    }
+    lensChanged.fire()
     render()
     if (isNew) offerToGo()
   } else if (m.type === 'clear') {
     anchor = null
+    lensChanged.fire()
     render()
+  } else if (m.type === 'official' && typeof m.term === 'string' && Array.isArray(m.lines)) {
+    void showOfficial(m)
   } else if (m.type === 'status' && typeof m.text === 'string') {
     status.text = '$(sparkle) ' + m.text.slice(0, 80)
     status.tooltip = typeof m.tooltip === 'string' ? m.tooltip.slice(0, 200) : ''
@@ -300,40 +314,114 @@ function markedLine(ed, views) {
   return at && at.cell === hit.index ? at.line : -1
 }
 
+/**
+ * Follow how far they are in the step (nothing is drawn in their text): lines typed, the step done, and which
+ * pseudocode line the label's official line is for.
+ */
 function render() {
   const views = new Map()
   for (const ed of vscode.window.visibleTextEditors) {
     const marked = markedLine(ed, views)
-    if (marked < 0) {
-      ed.setDecorations(markerType, [])
-      ed.setDecorations(ghostType, [])
-      continue
-    }
+    if (marked < 0 || ed !== vscode.window.activeTextEditor) continue
     const doc = ed.document
     const a = Math.min(Math.max(0, marked), doc.lineCount - 1)
-    ed.setDecorations(markerType, [new vscode.Range(a, 0, a, 0)])
     const lines = []
     for (let i = 0; i < doc.lineCount; i++) lines.push(doc.lineAt(i).text)
     const at = ghostAt(lines, a, ed.selection.active.line, anchor.ghost)
-    if (at.ghost) {
-      const end = doc.lineAt(at.ghost.line).range.end
-      ed.setDecorations(ghostType, [{ range: new vscode.Range(end, end), renderOptions: { after: { contentText: '◆ ' + at.ghost.text } } }])
-    } else {
-      ed.setDecorations(ghostType, [])
+    const n = typedCount(lines, a, ed.selection.active.line, anchor.ghost.length)
+    const index = Math.min(n, Math.max(0, anchor.ghost.length - 1))
+    if (index !== stepIndex) {
+      stepIndex = index
+      lensChanged.fire()
     }
-    if (ed === vscode.window.activeTextEditor) {
-      const n = typedCount(lines, a, ed.selection.active.line, anchor.ghost.length)
-      const key = `${anchor.stepId}:${n}`
-      if (key !== typedSent) {
-        typedSent = key
-        send({ type: 'step_typed', stepId: anchor.stepId, n })
-      }
+    const key = `${anchor.stepId}:${n}`
+    if (key !== typedSent) {
+      typedSent = key
+      send({ type: 'step_typed', stepId: anchor.stepId, n })
     }
     if (at.done && doneSent !== anchor.stepId && ed === vscode.window.activeTextEditor) {
       doneSent = anchor.stepId
       send({ type: 'step_done', stepId: anchor.stepId })
     }
   }
+}
+
+// ── The label above the step, and its official line ──
+
+function officialOf(o) {
+  return o && typeof o.method === 'string' && typeof o.docUrl === 'string' && /^https:\/\//.test(o.docUrl) ? { method: o.method.slice(0, 100), docUrl: o.docUrl } : null
+}
+
+/** The official line for the pseudocode line they are on, else the next one that has one, else any. */
+function currentOfficial() {
+  if (!anchor) return null
+  const list = anchor.official
+  for (let i = stepIndex; i < list.length; i++) if (list[i]) return list[i]
+  return list.find(Boolean) || null
+}
+
+/** "◆ Read the second number · See the official line (Console.ReadLine)", above the line where the step goes. */
+const lensProvider = {
+  onDidChangeCodeLenses: lensChanged.event,
+  provideCodeLenses(doc) {
+    if (!anchor) return []
+    const ed = vscode.window.visibleTextEditors.find((e) => e.document === doc)
+    const marked = ed ? markedLine(ed, new Map()) : doc.uri.scheme === 'file' && samePath(doc.uri.fsPath, anchor.file) ? anchor.line - 1 : -1
+    if (marked < 0) return []
+    const line = Math.min(Math.max(0, marked), doc.lineCount - 1)
+    const range = new vscode.Range(line, 0, line, 0)
+    const lenses = [new vscode.CodeLens(range, { title: `◆ ${anchor.title || 'Your next step goes here'}`, command: '' })]
+    const o = currentOfficial()
+    if (o) lenses.push(new vscode.CodeLens(range, { title: `See the official line (${o.method})`, command: 'bettercoder.seeOfficial', arguments: [o] }))
+    return lenses
+  }
+}
+
+/** The read-only documents the official examples open in. */
+const officialContent = {
+  provideTextDocumentContent(uri) {
+    return officialDocs.get(uri.toString()) || ''
+  }
+}
+
+let officialAsked = null
+
+/** Ask the app for the official example (it fetches it from the official docs; nothing comes from the coach). */
+function seeOfficial(o) {
+  if (!o) return
+  if (!socket) return vscode.window.showWarningMessage('BetterCoder: the app is not connected.')
+  officialAsked = o
+  send({ type: 'official', url: o.docUrl, term: o.method })
+}
+
+/** Open the official example inline under the step's line, its line lit. Read-only: it can't be typed into. */
+async function showOfficial(m) {
+  const asked = officialAsked
+  officialAsked = null
+  if (!anchor || !asked || asked.method !== m.term) return
+  const url = typeof m.url === 'string' && /^https:\/\//.test(m.url) ? m.url : asked.docUrl
+  if (m.lines.length === 0) {
+    const pick = await vscode.window.showInformationMessage(`BetterCoder: that page has no example of ${m.term} to show.`, 'Open the docs')
+    if (pick) void vscode.env.openExternal(vscode.Uri.parse(url))
+    return
+  }
+  let host = 'docs'
+  try {
+    host = new URL(url).host
+  } catch {}
+  const ext = path.extname(anchor.file) || '.txt'
+  const safe = m.term.replace(/[^\w.-]+/g, '_').slice(0, 60)
+  const uri = vscode.Uri.from({ scheme: OFFICIAL_SCHEME, path: `/${host}/${safe}${ext === '.ipynb' ? '.py' : ext}` })
+  const text = m.lines.map(String).slice(0, 200).join('\n')
+  officialDocs.set(uri.toString(), text)
+  const ed = vscode.window.activeTextEditor
+  if (!ed || markedLine(ed, new Map()) < 0) await goToStep()
+  const here = vscode.window.activeTextEditor
+  if (!here) return
+  const marked = Math.max(0, markedLine(here, new Map()))
+  const focus = Number.isInteger(m.focus) && m.focus >= 0 && m.focus < m.lines.length ? m.focus : 0
+  const lit = new vscode.Range(focus, 0, focus, String(m.lines[focus]).length)
+  await vscode.commands.executeCommand('editor.action.peekLocations', here.document.uri, new vscode.Position(marked, 0), [new vscode.Location(uri, lit)], 'peek')
 }
 
 // ── ▶ Run ──
@@ -463,17 +551,6 @@ function activate(context) {
   status.text = '$(circle-slash) BetterCoder'
   status.command = 'bettercoder.goToStep'
   status.show()
-  markerType = vscode.window.createTextEditorDecorationType({
-    gutterIconPath: context.asAbsolutePath(path.join('media', 'marker.svg')),
-    gutterIconSize: 'contain',
-    isWholeLine: true,
-    backgroundColor: 'rgba(192, 57, 75, 0.10)',
-    overviewRulerColor: '#C0394B',
-    overviewRulerLane: vscode.OverviewRulerLane.Left
-  })
-  ghostType = vscode.window.createTextEditorDecorationType({
-    after: { color: '#C98A92', fontStyle: 'italic', margin: '0 0 0 2em' }
-  })
   runProblems = vscode.languages.createDiagnosticCollection('bettercoder-run')
 
   const activeDoc = () => {
@@ -483,9 +560,11 @@ function activate(context) {
 
   context.subscriptions.push(
     status,
-    markerType,
-    ghostType,
     runProblems,
+    lensChanged,
+    vscode.languages.registerCodeLensProvider([{ scheme: 'file' }, { scheme: 'vscode-notebook-cell' }], lensProvider),
+    vscode.workspace.registerTextDocumentContentProvider(OFFICIAL_SCHEME, officialContent),
+    vscode.commands.registerCommand('bettercoder.seeOfficial', (o) => seeOfficial(o || currentOfficial())),
     vscode.commands.registerCommand('bettercoder.reconnect', () => {
       socket?.destroy()
       connect()

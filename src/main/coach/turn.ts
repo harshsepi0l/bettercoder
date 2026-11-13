@@ -12,7 +12,7 @@ export const MAX_TOOL_RESULT_CHARS = 12000
 /** Messages BetterCoder adds to steer the model. Never shown to the learner. */
 export const HIDDEN_PREFIX = '[BetterCoder'
 export const READ_TOOLS = new Set(['list_files', 'read_file', 'search', 'project_outline'])
-export const INTENTS = new Set<CoachIntent>(['visualize', 'stuck', 'where', 'next'])
+export const INTENTS = new Set<CoachIntent>(['visualize', 'stuck', 'where', 'next', 'task'])
 
 /**
  * A button's intent travels with the input as a small machine tag (the learner
@@ -37,7 +37,8 @@ export interface TurnState {
   /** Hidden redos because a reply typed a tool's name instead of calling it. */
   toolRetries: number
   readCalls: number
-  animated: boolean
+  /** A whiteboard was drawn since their message. */
+  drew: boolean
   asked: boolean
   nudged: boolean
 }
@@ -51,7 +52,7 @@ export function turnState(messages: readonly Message[]): TurnState {
       break
     }
   }
-  const state: TurnState = { intent: null, rewrites: 0, toolRetries: 0, readCalls: 0, animated: false, asked: false, nudged: false }
+  const state: TurnState = { intent: null, rewrites: 0, toolRetries: 0, readCalls: 0, drew: false, asked: false, nudged: false }
   if (last === -1) return state
   state.intent = readIntent(textOf(messages[last].content))
   for (const m of messages.slice(last + 1)) {
@@ -63,7 +64,7 @@ export function turnState(messages: readonly Message[]): TurnState {
     } else if (m.role === 'assistant') {
       for (const c of m.content) if (c.type === 'toolCall' && READ_TOOLS.has(c.name)) state.readCalls++
     } else if (m.role === 'toolResult' && !m.isError) {
-      if (ANIMATE_TOOLS.has(m.toolName)) state.animated = true
+      if (m.toolName === 'draw_board') state.drew = true
       if (m.toolName === 'ask_question' || (m.toolName === 'show_step' && (m.details as { question?: unknown } | undefined)?.question)) state.asked = true
     }
   }
@@ -76,14 +77,12 @@ export function textOf(content: unknown): string {
   return content.map((c) => (c && typeof c === 'object' && (c as { type?: string }).type === 'text' ? String((c as { text?: string }).text ?? '') : '')).join('')
 }
 
-/** The tools that run code in the animator (the learner's own, or a hidden example). */
-export const ANIMATE_TOOLS: ReadonlySet<string> = new Set(['animate_code', 'animate_example'])
 
 /**
  * Tool names never belong in reply text; models sometimes type one instead of calling it.
  * Only BetterCoder's own names: read_file or list_files may well be functions in the learner's code.
  */
-export const CARD_TOOL_NAMES = ['ask_question', 'show_diagram', 'point_to_code', 'show_step', 'explain_concept', 'show_steps', 'show_pseudocode', ...ANIMATE_TOOLS, 'project_outline', 'note_skill', 'track_progress']
+export const CARD_TOOL_NAMES = ['ask_question', 'show_diagram', 'point_to_code', 'show_step', 'explain_concept', 'show_steps', 'show_pseudocode', 'draw_board', 'animate_code', 'animate_example', 'project_outline', 'note_skill', 'track_progress', 'set_task']
 export const TOOL_NAME_WORD = new RegExp(`\\S*(?:${CARD_TOOL_NAMES.join('|')})\\S*`, 'g')
 export const MAX_TOOL_RETRIES = 1
 

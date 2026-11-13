@@ -1,4 +1,3 @@
-import type { Trace, TraceValue } from '../../shared/trace'
 
 /**
  * The no-code guard. Every piece of assistant text passes through here before
@@ -206,7 +205,7 @@ export function pseudocodeProblem(line: string): string | null {
 
 /**
  * A printed or stored value, not code: a number, text, or a list / dict / set / tuple of them, as Python or JSON
- * prints it ("[1, 2, 3]", "{'a': 1}", "(3, 'x')", "True"). Used for what a hidden example shows (regression: a printed
+ * prints it ("[1, 2, 3]", "{'a': 1}", "(3, 'x')", "True"). Used for values on the whiteboard (regression: a printed
  * "[1, 2, 3]" was refused as code).
  */
 export function isDataLiteral(line: string): boolean {
@@ -215,26 +214,4 @@ export function isDataLiteral(line: string): boolean {
   // Quoted text becomes a placeholder; what is left may only be numbers, words for constants, and brackets.
   const rest = t.replace(/b?'(?:[^'\\]|\\.)*'|b?"(?:[^"\\]|\\.)*"/g, 'S').replace(/\b(True|False|None|true|false|null)\b/g, 'S')
   return /^[\s\d.eE+\-S[\]{}(),:]+$/.test(rest) && !/\d\s+\d/.test(rest.replace(/\s*[,:]\s*/g, ','))
-}
-
-/**
- * What a hidden example shows the learner (printed output and text values) must be data, not code: the coach's
- * example code never leaves the main process, so it may not sneak out through a print. Printed values like
- * [1, 2, 3] are data.
- */
-export function exampleProblem(trace: Trace): string | null {
-  const lines = new Set<string>()
-  const visit = (v: TraceValue) => {
-    if (v.t === 'str') for (const l of v.v.split('\n')) lines.add(l.trim())
-    else if (v.t === 'list') v.items.forEach(visit)
-    else if (v.t === 'dict') v.entries.forEach(([k, x]) => (visit(k), visit(x)))
-    else if (v.t === 'obj') v.fields.forEach(([, x]) => visit(x))
-  }
-  for (const s of trace.steps) {
-    for (const f of s.frames) for (const [, v] of f.locals) visit(v)
-    if (s.returnValue) visit(s.returnValue)
-  }
-  for (const l of (trace.steps.at(-1)?.output ?? '').split('\n')) lines.add(l.trim())
-  for (const t of lines) if (t && isCodeLine(t) && !isDataLiteral(t)) return `The example shows code to the learner ("${t.slice(0, 80)}"). Print and keep data only, in plain values.`
-  return null
 }

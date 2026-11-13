@@ -8,3 +8,4 @@ clean-architecture/
 .env
 .env.*
 vendor/
+src/renderer/public/fonts/

@@ -1,12 +1,14 @@
 import { useMemo } from 'react'
 import type { ProjectInfo } from '../../../../shared/ipc'
 import { CoachTab } from '@/features/project/coach-tab'
+import { TaskToasts } from '@/features/tasks/tasks-tab'
 import { IdeMeterRow, useIde } from './ide-meter'
 import type { Coach } from './use-coach'
 
 /**
- * The coach, beside the learner's work: always on the right, whichever tab is open on the left. One slim row of
- * meters, then one chat. The newest step card ticks off the lines they have written in the editor.
+ * The coach, beside the learner's work: always on the right, whichever tab is open on the left. One slim row (how it
+ * is going), then one chat, with task notifications over its top (the tasks themselves are a tab). The newest step
+ * card ticks off the lines they have written in the editor.
  */
 export function CoachPane({
   project,
@@ -14,6 +16,7 @@ export function CoachPane({
   hasModel,
   onOpenProject,
   onOpenSettings,
+  onViewTasks,
   children
 }: {
   project: ProjectInfo | null
@@ -21,6 +24,8 @@ export function CoachPane({
   hasModel: boolean
   onOpenProject: () => void
   onOpenSettings: () => void
+  /** Open the Tasks tab (from a notification). */
+  onViewTasks: () => void
   /** The composer. */
   children?: React.ReactNode
 }) {
@@ -35,15 +40,19 @@ export function CoachPane({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {project?.root && <IdeMeterRow busy={coach.busy} onSend={coach.send} />}
-      <CoachTab
-        project={project}
-        onOpenProject={onOpenProject}
-        coach={coach}
-        hasModel={hasModel}
-        onOpenSettings={onOpenSettings}
-        inPane
-        typed={step ? { id: step.id, n: written } : undefined}
-      />
+      {/* The chat, with task notifications over its top (below the row above). */}
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        {project?.root && <TaskToasts onView={onViewTasks} />}
+        <CoachTab
+          project={project}
+          onOpenProject={onOpenProject}
+          coach={coach}
+          hasModel={hasModel}
+          onOpenSettings={onOpenSettings}
+          inPane
+          typed={step ? { id: step.id, n: written } : undefined}
+        />
+      </div>
       {children}
     </div>
   )

@@ -11,7 +11,7 @@ import { HIDDEN_PREFIX, readIntent, stripIntent, turnState, textOf, hasCode } fr
  * everything, so old file contents are what makes token use balloon), and replies
  * that contained code are replaced by a stub so the model never builds on them.
  */
-export function prepareMessages(messages: readonly Message[], hasPython = true, idea = false, editor = ''): Message[] {
+export function prepareMessages(messages: readonly Message[], idea = false, editor = ''): Message[] {
   // The learner's latest message: hidden redo messages ("[BetterCoder] …") belong to the same turn.
   let lastUser = -1
   for (let i = messages.length - 1; i >= 0; i--) {
@@ -32,7 +32,7 @@ export function prepareMessages(messages: readonly Message[], hasPython = true, 
       const text = textOf(m.content)
       const intent = readIntent(text)
       if (i === lastUser) {
-        const reminder = turnReminder(intent ?? turnState(messages).intent, hasPython, idea)
+        const reminder = turnReminder(intent ?? turnState(messages).intent, idea)
         // The editor as it is now: only on this request, so stale copies never pile up in the transcript.
         return { ...m, content: `${stripIntent(text)}\n\n${editor ? `${editor}\n\n` : ''}${reminder}` }
       }

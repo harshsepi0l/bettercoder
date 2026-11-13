@@ -27,7 +27,8 @@ export const HARNESS_IPC = {
 export type ProviderId = string
 
 /** What a composer button asks for. Structured data from the UI, never guessed from words. */
-export type CoachIntent = 'visualize' | 'stuck' | 'where' | 'next'
+/** Buttons the learner pressed. `task`: they added a task, and the coach writes how to check it. */
+export type CoachIntent = 'visualize' | 'stuck' | 'where' | 'next' | 'task'
 
 
 export interface ProviderStatus {

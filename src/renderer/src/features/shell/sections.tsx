@@ -1,5 +1,7 @@
-import { BookOpen, Clapperboard, Code2, Map, MessageSquare, type LucideIcon } from 'lucide-react'
+import { BookOpen, Code2, ListChecks, Map, MessageSquare, PenLine, type LucideIcon } from 'lucide-react'
 import type { CoachIntent } from '../../../../shared/harness'
+import type { TaskView } from '../../../../shared/tasks'
+import { TasksTab } from '@/features/tasks/tasks-tab'
 import { MapTab } from '@/features/map/map-tab'
 import { SourcesTab } from '@/features/sources/sources-tab'
 import { VisualizeTab } from '@/features/visualize/visualize-tab'
@@ -8,26 +10,27 @@ import { CoachTab } from '@/features/project/coach-tab'
 import { CodeSurface } from '@/features/code/vscode-frame'
 import type { Coach } from '@/features/coach/use-coach'
 
-export type SectionId = 'code' | 'coach' | 'visualize' | 'map' | 'sources'
+export type SectionId = 'code' | 'coach' | 'tasks' | 'visualize' | 'map' | 'sources'
 
 /**
- * Inside a session. Code is the learner's editor; Coach and Sources belong to the session; the Map to the project.
+ * Inside a session. Code is the learner's editor; Coach, Tasks and Sources belong to the session; the Map to the project.
  * Beside the editor, the coach has its own pane on the right, so it is not a tab there (see layoutSections).
  */
 export const SECTIONS: Array<{ id: SectionId; label: string; icon: LucideIcon }> = [
   { id: 'code', label: 'Code', icon: Code2 },
   { id: 'coach', label: 'Coach', icon: MessageSquare },
-  { id: 'visualize', label: 'Visualize', icon: Clapperboard },
+  { id: 'tasks', label: 'Tasks', icon: ListChecks },
+  { id: 'visualize', label: 'Visualize', icon: PenLine },
   { id: 'map', label: 'Map', icon: Map },
   { id: 'sources', label: 'Sources', icon: BookOpen }
 ]
 
 /**
- * Which tabs show. Wide: Code, Visualize, Map, Sources (the coach is the right pane). Narrow: Code and Coach become
- * tabs of their own.
+ * Which tabs show. Wide: Code, Tasks, Visualize, Map, Sources (the coach is the right pane). Narrow: the coach becomes
+ * a tab of its own.
  */
 export function layoutSections(opts: { wide: boolean }): SectionId[] {
-  return opts.wide ? ['code', 'visualize', 'map', 'sources'] : ['code', 'coach', 'visualize', 'map', 'sources']
+  return opts.wide ? ['code', 'tasks', 'visualize', 'map', 'sources'] : ['code', 'coach', 'tasks', 'visualize', 'map', 'sources']
 }
 
 export function SectionContent({
@@ -39,6 +42,8 @@ export function SectionContent({
   hasModel,
   onOpenSettings,
   onAsk,
+  onAskTask,
+  onViewTasks,
   onPickFolder
 }: {
   section: SectionId
@@ -51,6 +56,10 @@ export function SectionContent({
   onOpenSettings: () => void
   /** Send something to the coach and switch to it (from Map and Sources). */
   onAsk: (text: string, intent?: CoachIntent) => void
+  /** Ask the coach about one task in their own words (the composer takes it and is shown). */
+  onAskTask: (task: TaskView) => void
+  /** Open the Tasks tab (from a task notification). */
+  onViewTasks: () => void
   /** Pick a folder for a project that has none (an idea), from the Code tab. */
   onPickFolder: () => void
 }) {
@@ -65,10 +74,13 @@ export function SectionContent({
           coach={coach}
           hasModel={hasModel}
           onOpenSettings={onOpenSettings}
+          onViewTasks={onViewTasks}
         />
       )
+    case 'tasks':
+      return <TasksTab busy={coach.busy} onSend={onAsk} onAsk={onAskTask} />
     case 'visualize':
-      return <VisualizeTab project={project} items={coach.items} />
+      return <VisualizeTab items={coach.items} busy={coach.busy} onAsk={onAsk} />
     case 'map':
       return <MapTab project={project} onAsk={onAsk} />
     case 'sources':

@@ -31,6 +31,8 @@ function readSidebarOpen(): boolean {
 export function App() {
   const [section, setSection] = useState<SectionId>('code')
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // The task they are asking the coach about, from the Tasks tab.
+  const [about, setAbout] = useState<{ id: string; title: string } | null>(null)
   const [atHome, setAtHome] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarOpen)
   const ideaRef = useRef<HTMLTextAreaElement>(null)
@@ -57,13 +59,13 @@ export function App() {
   useEffect(() => {
     if (!sessionId) return
     setAtHome(false)
+    setAbout(null)
     // A session opens on the code; an idea with no folder (in a narrow window) on the coach.
     setSection(isIdea && !wide ? 'coach' : 'code')
     // Only when the session changes.
   }, [sessionId])
-  // A locked tab (Map in an idea; Visualize until it has an animation) falls back to Coach. Same rule as the tab row
-  // (regression: this sent every idea back to Coach, so an unlocked Visualize tab still would not open).
-  const locked = useMemo(() => lockedSections(isIdea, coach.items), [isIdea, coach.items])
+  // A locked tab (Map and Tasks in an idea) falls back to the first tab. Same rule as the tab row.
+  const locked = useMemo(() => lockedSections(isIdea), [isIdea])
   // Wide: the coach is a pane beside the Code tab's VS Code.
   const paneLayout = wide
   const shown = layoutSections({ wide })
@@ -129,6 +131,8 @@ export function App() {
       hasCode={!isIdea}
       onSend={coach.send}
       onStop={coach.stop}
+      about={about}
+      onClearAbout={() => setAbout(null)}
     />
   )
   const tabs = (
@@ -148,6 +152,11 @@ export function App() {
           // Beside the editor the coach is already on screen; otherwise switch to it.
           if (!paneLayout) setSection('coach')
           coach.send(text, intent)
+        }}
+        onViewTasks={() => setSection('tasks')}
+        onAskTask={(task) => {
+          setAbout({ id: task.id, title: task.title })
+          if (!paneLayout) setSection('coach')
         }}
       />
     </PanelTabs>
@@ -188,7 +197,8 @@ export function App() {
               <Home workspace={workspace} hasModel={hasModel} onOpenSettings={() => setSettingsOpen(true)} ideaRef={ideaRef} />
             ) : (
               <>
-                <SessionBar workspace={workspace} wide={wide} />
+                {/* Wide: the title bar already names the project and session. */}
+                {!wide && <SessionBar workspace={workspace} />}
                 {paneLayout ? (
                   // The learner's work on the left, the coach always on the right (resizable).
                   <CoachSplit
@@ -200,6 +210,7 @@ export function App() {
                         hasModel={hasModel}
                         onOpenProject={() => workspace.open()}
                         onOpenSettings={() => setSettingsOpen(true)}
+                        onViewTasks={() => setSection('tasks')}
                       >
                         {composer}
                       </CoachPane>

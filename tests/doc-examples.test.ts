@@ -5,7 +5,7 @@ import assert from 'node:assert/strict'
 import { readFile, mkdtemp } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createDocExamples, exampleLanguage, extractExample, isOfficialDoc } from '../src/main/engines/map/doc-examples'
+import { createDocExamples, editorExample, exampleLanguage, extractExample, isOfficialDoc } from '../src/main/engines/map/doc-examples'
 
 const page = (name: string) => readFile(join(import.meta.dirname, 'fixtures', 'docs', name), 'utf8')
 const focused = (e: ReturnType<typeof extractExample>) => (e && e.focus !== undefined ? e.excerpt[e.focus] : '')
@@ -77,4 +77,13 @@ test('examples follow the project language', () => {
 test('a term no example line uses gives no example, not the top of the page', async () => {
   const html = await page('console-readline.html')
   assert.equal(extractExample(html, 'https://learn.microsoft.com/en-us/dotnet/api/system.console.readline', 'turning text into a number', 'csharp'), null)
+})
+
+test('the editor\'s "See the official line": the whole example, word for word, with the method\'s line lit', async () => {
+  const e = extractExample(await page('console-readline.html'), 'https://learn.microsoft.com/en-us/dotnet/api/system.console.readline', 'Console.ReadLine', 'csharp')
+  const shown = editorExample(e)
+  assert.deepEqual(shown.lines, e!.full, 'the whole example, as the page has it')
+  assert.match(shown.lines[shown.focus], /=\s*Console\.ReadLine\(\)/, 'its ReadLine line is the one lit')
+  assert.deepEqual(editorExample({ url: 'u', excerpt: ['a', 'b'], focus: 1 }), { lines: ['a', 'b'], focus: 1 }, 'no full example: the excerpt')
+  assert.deepEqual(editorExample(null), { lines: [], focus: -1 }, 'none found: nothing to show')
 })

@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { createModels, fauxAssistantMessage, fauxProvider, fauxText, fauxToolCall } from '@earendil-works/pi-ai'
 import type { HarnessEvent } from '../src/shared/harness'
 import type { ProjectInfo } from '../src/shared/ipc'
-import type { IdeView, TaskProgress, ToIde } from '../src/shared/ide'
+import type { IdeView, ToIde } from '../src/shared/ide'
 import { Coach } from '../src/main/coach/coach'
 import { type AnchoredStep } from '../src/main/coach/replay'
 import { IdeBridge, parseIdeMessage } from '../src/main/adapters/ide-socket'
@@ -175,13 +175,13 @@ test('a step card can mark a line in their file, inside the project only; an ide
   assert.equal((r2.details as { anchor?: unknown }).anchor, undefined)
 })
 
-test('with an editor linked: the coach gets its view on the request, marks the step, keeps progress hidden, and both come back after a restart', async () => {
+test('with an editor linked: the coach gets its view and the tasks on the request, marks the step, adds tasks out of the chat, and the marker comes back after a restart', async () => {
   const faux = fauxProvider()
   const models = createModels()
   models.setProvider(faux.provider)
   const file = join(await mkdtemp(join(tmpdir(), 'bc-ide-coach-')), 's.sqlite')
   const steps: Array<AnchoredStep | null> = []
-  const progress: TaskProgress[][] = []
+  const added: Array<{ id?: string; title: string; doneWhen: string; answer: string }> = []
   const events: HarnessEvent[] = []
   const seen: Array<{ messages: unknown[] }> = []
   const deps = {
@@ -190,20 +190,18 @@ test('with an editor linked: the coach gets its view on the request, marks the s
     resolveModel: async () => faux.getModel(),
     editorContext: () => '[BetterCoder editor: what the learner has open in VS Code right now.\nFile: Program.cs, cursor on line 2\nEnd of editor view.]',
     onStep: (s: AnchoredStep | null) => steps.push(s),
-    onProgress: (t: TaskProgress[]) => progress.push(t)
+    setTask: (t: { id?: string; title: string; doneWhen: string; answer: string }) => (added.push(t), { id: `t${added.length}` }),
+    tasksContext: () => '[BetterCoder tasks: the learner\'s tasks, in order.\n- t1 Add two numbers: open. Done when: run with 7 and 5.\nEnd of tasks.]'
   }
   const coach = track(await Coach.open(file, PROJECT, (e) => events.push(e), deps))
-  const tasks = [
-    { title: 'Read two numbers', percent: 0 },
-    { title: 'Print the result', percent: 0 }
-  ]
   faux.setResponses([
     (ctx) => (
       seen.push(ctx as never),
       fauxAssistantMessage(
         [
           fauxText('**Read two numbers first**'),
-          fauxToolCall('track_progress', { tasks }),
+          fauxToolCall('set_task', { title: 'Print the result', done_when: 'Run it with 7 and 5: it prints the sum', answer: '12' }),
+          fauxToolCall('set_task', { title: 'Sneaky', done_when: 'print(a + b)', answer: '12' }),
           fauxToolCall('show_step', { title: 'Read two numbers', lines: [{ text: 'first ← ask for a number' }, { text: 'second ← ask for a number' }], at: { path: 'Program.cs', line: 2 } })
         ],
         { stopReason: 'toolUse' }
@@ -216,19 +214,22 @@ test('with an editor linked: the coach gets its view on the request, marks the s
 
   const request = JSON.stringify(seen[0].messages)
   assert.match(request, /\[BetterCoder editor: what the learner has open/, 'the editor view rides on the request')
-  assert.deepEqual(progress, [tasks])
+  assert.match(request, /\[BetterCoder tasks: /, 'and the tasks')
+  assert.deepEqual(added, [{ title: 'Print the result', doneWhen: 'Run it with 7 and 5: it prints the sum', answer: '12' }], 'a check written as code is refused')
   const step = steps.at(-1)
   assert.equal(step?.path, 'Program.cs')
   assert.equal(step?.line, 2)
   assert.deepEqual(step?.ghost, ['first ← ask for a number', 'second ← ask for a number'])
-  assert.ok(!events.some((e) => JSON.stringify(e).includes('Print the result')), 'progress is a meter, never a chat item')
+  assert.equal(step?.title, 'Read two numbers', 'the editor labels the line with the step')
+  assert.deepEqual(step?.official, [null, null], 'no method tagged: no official line to offer')
+  assert.ok(!events.some((e) => JSON.stringify(e).includes('Print the result')), 'tasks have their own card, never a chat item')
 
   await coach.close()
   const again = track(await Coach.open(file, PROJECT, () => undefined, deps))
-  assert.deepEqual(again.initialProgress, tasks, 'the meter is rebuilt from the transcript')
   assert.equal(again.initialStep?.id, step?.id, 'and the marker comes back')
   assert.ok(!again.initialItems.some((i) => JSON.stringify(i).includes('Print the result')))
   assert.ok(!JSON.stringify(again.initialItems).includes('[BetterCoder editor'), 'the editor view is never stored')
+  assert.ok(!JSON.stringify(again.initialItems).includes('[BetterCoder tasks'), 'nor the tasks view')
 })
 
 test('the hub sends the editor an absolute marker and a status line, and tells the panel when a step is typed out', () => {
@@ -236,9 +237,10 @@ test('the hub sends the editor an absolute marker and a status line, and tells t
   const views: IdeView[] = []
   let s = snap({ lastEditAt: 1000 })
   const hub = new IdeHub({ snapshot: () => s, send: (m) => sent.push(m) }, (v) => views.push(v), () => 2000)
-  hub.setSession({ root: ROOT }, [{ title: 'Read two numbers', percent: 50 }], { id: 'card-1', path: 'Program.cs', line: 2, ghost: ['a ← read'] })
-  assert.deepEqual(sent.find((m) => m.type === 'anchor'), { type: 'anchor', stepId: 'card-1', file: join(ROOT, 'Program.cs'), line: 2, ghost: ['a ← read'] })
-  assert.deepEqual(sent.find((m) => m.type === 'status'), { type: 'status', text: 'Read two numbers 50% · flowing', tooltip: 'Typing steadily' })
+  const official = [{ method: 'Console.ReadLine', docUrl: 'https://learn.microsoft.com/en-us/dotnet/api/system.console.readline' }]
+  hub.setSession({ root: ROOT }, 'Read two numbers · 0 of 2 done', { id: 'card-1', path: 'Program.cs', line: 2, title: 'Read a number', ghost: ['a ← read'], official })
+  assert.deepEqual(sent.find((m) => m.type === 'anchor'), { type: 'anchor', stepId: 'card-1', file: join(ROOT, 'Program.cs'), line: 2, title: 'Read a number', ghost: ['a ← read'], official })
+  assert.deepEqual(sent.find((m) => m.type === 'status'), { type: 'status', text: 'Read two numbers · 0 of 2 done · flowing', tooltip: 'Typing steadily' })
   const v = views.at(-1)!
   assert.equal(v.file, 'Program.cs')
   assert.equal(v.mood, 'flowing')
@@ -290,7 +292,7 @@ test('lines typed: VS Code reports them for the marked step, and the panel shows
   const s = snap({ stepTyped: { stepId: 'card-7', n: 2 } })
   const feed = { snapshot: () => s, send: () => undefined }
   const hub = new IdeHub(feed, (v) => (view = v))
-  hub.setSession({ root: ROOT }, [], { id: 'card-7', path: 'Program.cs', line: 2, ghost: ['a', 'b', 'c'] } as AnchoredStep)
+  hub.setSession({ root: ROOT }, '', { id: 'card-7', path: 'Program.cs', line: 2, ghost: ['a', 'b', 'c'] } as AnchoredStep)
   assert.equal(hub.view().typed, 2)
   hub.setStep({ id: 'card-8', path: 'Program.cs', line: 2, ghost: ['a'] } as AnchoredStep)
   assert.equal(hub.view().typed, 0, 'counts for another step do not carry over')

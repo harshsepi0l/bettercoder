@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { BookOpen, Clapperboard, ExternalLink, FileCode2, Lightbulb, ListOrdered, ScrollText, Workflow } from 'lucide-react'
-import { TracePlayer } from '@/features/visualize/player'
+import { BookOpen, Clapperboard, ExternalLink, PenLine, FileCode2, Lightbulb, ListOrdered, ScrollText, Workflow } from 'lucide-react'
+import { BoardPlayer } from '@/features/visualize/board-player'
 import { QuestionBody } from './question-body'
 import { StepCard } from './step-card'
 import { DocExampleView } from '@/features/sources/doc-example'
@@ -45,33 +45,36 @@ export function CardView({
       return <PseudocodeCard card={card} revealAll={!latest} />
     case 'step':
       return <StepCard card={card} answer={answer} active={!!active} onAnswer={onAnswer} typed={typed} />
+    case 'board':
+      return <BoardCard card={card} />
     case 'animation':
-      return <AnimationCard card={card} />
+      return <OldAnimation card={card} />
   }
 }
 
-function AnimationCard({ card }: { card: Extract<Card, { kind: 'animation' }> }) {
+function BoardCard({ card }: { card: Extract<Card, { kind: 'board' }> }) {
   return (
     <div className={SHELL}>
       <div className={LABEL}>
-        <Clapperboard className="size-3 text-brand-text" aria-hidden="true" />
+        <PenLine className="size-3 text-brand-text" aria-hidden="true" />
         {card.title.toUpperCase()}
-        <span className="ml-auto normal-case tracking-normal">{card.trace.example ? 'example run' : `real run · ${card.trace.file}`}</span>
       </div>
-      <ol className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-        {/* A hidden example has no file to run calls on. */}
-        {(card.trace.example ? [] : card.trace.scenario).map((s, i) => (
-          <li key={i} className="rounded border bg-muted px-1.5 py-0.5 text-[11px]">
-            <span className="mr-1 font-mono text-muted-foreground">{i + 1}.</span>
-            {s}
-          </li>
-        ))}
-      </ol>
       <p className="flex items-start gap-2 text-[13px]">
         <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-brand-text" aria-hidden="true" />
         {card.note}
       </p>
-      <TracePlayer trace={card.trace} compact />
+      <BoardPlayer board={card.board} compact />
+    </div>
+  )
+}
+
+/** A card from the old animator (removed): past sessions show its title only. */
+function OldAnimation({ card }: { card: Extract<Card, { kind: 'animation' }> }) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-dashed px-3 py-2 text-[12px] text-muted-foreground">
+      <Clapperboard className="size-3.5 shrink-0" aria-hidden="true" />
+      <span className="min-w-0 flex-1 truncate">{card.title}</span>
+      <span className="shrink-0">old animation, no longer shown</span>
     </div>
   )
 }

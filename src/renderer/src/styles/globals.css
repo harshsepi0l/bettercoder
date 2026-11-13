@@ -109,3 +109,22 @@
 .app-no-drag {
   -webkit-app-region: no-drag;
 }
+
+/* A notification's bar running down while it shows (features/tasks). */
+@keyframes bc-shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0;
+  }
+}
+
+/* The whiteboard (Excalidraw) is read-only: none of its own menus or buttons show. */
+.bc-board .layer-ui__wrapper,
+.bc-board .App-menu,
+.bc-board .App-toolbar,
+.bc-board .footer-center,
+.bc-board .zen-mode-transition {
+  display: none !important;
+}

@@ -8,10 +8,10 @@ import { SessionMenu } from '@/features/workspace/menus'
 import { relativeTime } from './sidebar'
 
 /**
- * The open session's header. Wide: project / editable title.
- * Narrow (no sidebar): a session picker plus new-session and open-folder buttons.
+ * The open session's header on narrow windows (no sidebar): a session picker plus new-session and open-folder buttons.
+ * Wide windows have none: the title bar names the project and session, and the sidebar renames it.
  */
-export function SessionBar({ workspace, wide }: { workspace: Workspace; wide: boolean }) {
+export function SessionBar({ workspace }: { workspace: Workspace }) {
   const active = workspace.active
   const [title, setTitle] = useState(active?.session.title ?? '')
   const [renaming, setRenaming] = useState(false)
@@ -46,87 +46,61 @@ export function SessionBar({ workspace, wide }: { workspace: Workspace; wide: bo
   )
 
 
-  if (!wide) {
-    return (
-      <div className="flex shrink-0 items-center gap-1.5 border-b border-divider px-3 py-2">
-        {renaming && active ? (
-          <>
-            <label htmlFor="session-title-narrow" className="sr-only">
-              Session title
-            </label>
-            <Input
-              id="session-title-narrow"
-              ref={titleInput}
-              autoFocus
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              onBlur={commit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commit()
-                if (e.key === 'Escape') setRenaming(false)
-              }}
-              className="h-8 flex-1 bg-muted text-[12.5px]"
-            />
-          </>
-        ) : (
-        <Select value={active?.session.id} onValueChange={(id) => workspace.openSession(id)}>
-          <SelectTrigger size="sm" className="min-w-0 flex-1 bg-muted text-[12.5px]" aria-label="Session">
-            <SelectValue placeholder={workspace.projects.length ? 'Choose a session' : 'No sessions yet'} />
-          </SelectTrigger>
-          <SelectContent>
-            {workspace.projects.map((p) => (
-              <SelectGroup key={p.id}>
-                <SelectLabel>{p.name}</SelectLabel>
-                {p.sessions.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.title} · {relativeTime(s.updatedAt)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            ))}
-          </SelectContent>
-        </Select>
-        )}
-        {menu}
-        {linkButton}
-        {active && (
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label="New session in this project"
-            onClick={() => workspace.newSession(active.project.id)}
-          >
-            <Plus />
-          </Button>
-        )}
-        <Button variant="ghost" size="icon-sm" aria-label="Open a folder or files" onClick={() => workspace.open()}>
-          <FolderOpen />
-        </Button>
-      </div>
-    )
-  }
-
-  if (!active) return null
   return (
-    <div className="flex shrink-0 items-center gap-2 border-b border-divider px-3.5 py-2">
-      <span className="font-mono text-[12px] text-muted-foreground">{active.project.name}</span>
-      <span className="text-muted-foreground" aria-hidden="true">
-        /
-      </span>
-      <label htmlFor="session-title" className="sr-only">
-        Session title
-      </label>
-      <Input
-        id="session-title"
-        ref={titleInput}
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={commit}
-        onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-        className="h-7 max-w-md border-transparent bg-transparent px-1.5 text-[13px] font-medium text-heading shadow-none hover:border-input focus-visible:border-input dark:bg-transparent"
-      />
-      <div className="flex-1" />
+    <div className="flex shrink-0 items-center gap-1.5 border-b border-divider px-3 py-2">
+      {renaming && active ? (
+        <>
+          <label htmlFor="session-title-narrow" className="sr-only">
+            Session title
+          </label>
+          <Input
+            id="session-title-narrow"
+            ref={titleInput}
+            autoFocus
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit()
+              if (e.key === 'Escape') setRenaming(false)
+            }}
+            className="h-8 flex-1 bg-muted text-[12.5px]"
+          />
+        </>
+      ) : (
+      <Select value={active?.session.id} onValueChange={(id) => workspace.openSession(id)}>
+        <SelectTrigger size="sm" className="min-w-0 flex-1 bg-muted text-[12.5px]" aria-label="Session">
+          <SelectValue placeholder={workspace.projects.length ? 'Choose a session' : 'No sessions yet'} />
+        </SelectTrigger>
+        <SelectContent>
+          {workspace.projects.map((p) => (
+            <SelectGroup key={p.id}>
+              <SelectLabel>{p.name}</SelectLabel>
+              {p.sessions.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.title} · {relativeTime(s.updatedAt)}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          ))}
+        </SelectContent>
+      </Select>
+      )}
+      {menu}
       {linkButton}
+      {active && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="New session in this project"
+          onClick={() => workspace.newSession(active.project.id)}
+        >
+          <Plus />
+        </Button>
+      )}
+      <Button variant="ghost" size="icon-sm" aria-label="Open a folder or files" onClick={() => workspace.open()}>
+        <FolderOpen />
+      </Button>
     </div>
   )
 }

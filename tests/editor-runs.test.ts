@@ -97,6 +97,9 @@ test("editor runs: the run's problems go to the editor as underlines (syntax che
 test('editor link: run and terminal messages are parsed strictly and handed to the Code area, not the snapshot', async () => {
   assert.deepEqual(parseIdeMessage(JSON.stringify({ type: 'run', file: '/a/b.py', cols: 90, rows: 20 })), { type: 'run', file: '/a/b.py', cols: 90, rows: 20 })
   assert.equal(parseIdeMessage(JSON.stringify({ type: 'run', file: '/a/b.py' })), null)
+  const url = 'https://learn.microsoft.com/en-us/dotnet/api/system.console.readline'
+  assert.deepEqual(parseIdeMessage(JSON.stringify({ type: 'official', url, term: 'Console.ReadLine' })), { type: 'official', url, term: 'Console.ReadLine' })
+  assert.equal(parseIdeMessage(JSON.stringify({ type: 'official', url: 'file:///etc/passwd', term: 'x' })), null, 'only https links')
   assert.equal(parseIdeMessage(JSON.stringify({ type: 'term_input', id: 'x'.repeat(65), data: 'a' })), null)
   assert.equal(parseIdeMessage(JSON.stringify({ type: 'term_input', id: 't1', data: 'a'.repeat(70_000) })), null)
   assert.deepEqual(parseIdeMessage(JSON.stringify({ type: 'term_resize', id: 't1', cols: 5000, rows: 30 })), { type: 'term_resize', id: 't1', cols: 1000, rows: 30 })

@@ -1,16 +1,16 @@
 # BetterCoder
 
-A desktop app (Electron) that people write their code in (real VS Code in the Code tab, ▶ Run for every language) and that **coaches** them: new, intermediate and senior. It **never writes their code**. It asks where they're heading, shows visuals, runs and animates their own code, maps their project and links official docs.
+A desktop app (Electron) that people write their code in (real VS Code in the Code tab, ▶ Run for every language) and that **coaches** them: new, intermediate and senior. It **never writes their code**. It asks where they're heading, draws ideas and their code on a whiteboard, runs their code, maps their project and links official docs.
 
 ## Hard rules
 
 - **No code for the learner, ever.** There is one mode and no switch: every reply is checked in full before it is shown (`src/main/core/guard.ts`). A reply with code is silently redone up to 2 times, then a fixed fallback is shown. Cards are checked too.
   - One exception: the lines of a `show_step` card allow language-neutral pseudocode (`←`, words, simple maths). `pseudocodeProblem` in `guard.ts` rejects real syntax.
-  - Official doc examples: concept cards and Sources show a few lines of the official example, copied word for word (`engines/map/doc-examples.ts`). The app fetches them from an allowlist of official doc sites. They never come from the model, and the model never sees them.
+  - Official doc examples: concept cards, Sources and the editor's "See the official line" show the official example, copied word for word (`engines/map/doc-examples.ts`). The app fetches them from an allowlist of official doc sites. They never come from the model, and the model never sees them.
   - Part labels (topics they're new to): the coach names parts it *expects* in a method's official line (`parts` on a `show_step` line, names or symbols only) with plain-word labels. The app finds them in the copied line (`shared/line-parts.ts`) and drops any that aren't there; the learner taps an underlined part to see its label.
-  - Hidden examples: `animate_example` lets the coach write a small Python script that the animator runs (temp dir, same sandbox, works in idea sessions). Its code never leaves the main process: the trace goes out with `source: []`, `example: true`, and printed output or text values that look like code are refused. The player then shows only variables and output.
-- **The learner writes; the coach never does.** The learner writes in the Code tab's VS Code; the app itself writes nothing into their project. What reaches VS Code (`adapters/code-server.ts`, `adapters/editor-import.ts`) is held by `ipc/vscode.ts` alone, and the coach and services have no way to write (`tests/architecture.test.ts` enforces both). The coach, its tools, the animator and the services stay read-only: tools are sandboxed (`core/paths.ts` rules, `adapters/fs-readonly.ts` gate): no path escapes, secret files refused, secrets redacted. The coach never types in a terminal and never sees VS Code's own terminals. Coach-started runs (animator, hidden examples) run on a **temp copy** under macOS `sandbox-exec` (no network, no writes outside temp); the learner's ▶ Run runs for real in their project.
-- **Licences.** Allowed libraries are MIT: pi-ai, pi-agent-core, pi-durable, chord, node-pty, and code-server (downloaded into `vendor/`, not bundled in git). VS Code extensions come from Open VSX only (Microsoft's marketplace is for Microsoft's VS Code).
+  - Whiteboard: `draw_board` lets the coach draw in steps (boxes with a name and a value, rows of cells, notes, arrows) on a 10×10 grid (`shared/board.ts`: rules and layout). Every word on it goes through the no-code check; data values like `[1, 2, 3]` pass (`isDataLiteral`). Excalidraw draws it, read-only (`features/visualize/board-canvas.tsx`). Nothing runs: the old Python tracer is gone, and old `animation` cards show as one line.
+- **The learner writes; the coach never does.** The learner writes in the Code tab's VS Code; the app itself writes nothing into their project. What reaches VS Code (`adapters/code-server.ts`, `adapters/editor-import.ts`) is held by `ipc/vscode.ts` alone, and the coach and services have no way to write (`tests/architecture.test.ts` enforces both). The coach, its tools and the services stay read-only: tools are sandboxed (`core/paths.ts` rules, `adapters/fs-readonly.ts` gate): no path escapes, secret files refused, secrets redacted. The coach never types in a terminal and never sees VS Code's own terminals. The coach never runs code; the learner's ▶ Run runs for real in their project.
+- **Licences.** Allowed libraries are MIT: pi-ai, pi-agent-core, pi-durable, chord, node-pty, Excalidraw (the whiteboard; `scripts/copy-excalidraw-fonts.mjs` copies its fonts into the app, since the CSP blocks its CDN), and code-server (downloaded into `vendor/`, not bundled in git). VS Code extensions come from Open VSX only (Microsoft's marketplace is for Microsoft's VS Code).
 - **No word or regex routing of what the learner types.** Buttons send structured intents (`CoachIntent`). Typed text goes to the model as is. Use library mechanisms (pi-durable hooks, `configure({modelTools})`) instead.
 - **Sessions must never brick.** Recovery on open (`coach/coach.ts`); state is derived from the transcript (restart-safe).
 - Keys and sign-ins live in the OS keychain (`adapters/keychain.ts`, main process only). Anthropic *subscription* sign-in is blocked by their terms; API keys are fine.
@@ -21,7 +21,7 @@ A desktop app (Electron) that people write their code in (real VS Code in the Co
 - They hate reading. Coach replies are a **bold headline (8 words max) plus at most 3 short bullets**, with cards over text.
   - One step is ONE card (`show_step`): the idea, then the pseudocode, then an optional question.
   - **Never checklists**, in cards or text. Old `steps` cards from past sessions render as plain numbered lines.
-  - Step lines tagged with a method link to the official line. The learner picks how it shows (`codeView`): `highlight` (the line lit in its official example) or `stepper` (one line at a time). They pick it with visual previews in onboarding (its own step) and Settings › You, **never inside a session**. It defaults to highlight. The same choice sets how a hidden example's story shows in the animator: every step so far (highlight) or only the current one (stepper). Summaries to the user should be terse too.
+  - Step lines tagged with a method link to the official line. The learner picks how it shows (`codeView`): `highlight` (the line lit in its official example) or `stepper` (one line at a time). They pick it with visual previews in onboarding (its own step) and Settings › You, **never inside a session**. It defaults to highlight. The same choice sets how a whiteboard's story shows: every step so far (highlight) or only the current one (stepper). Summaries to the user should be terse too.
 - After every change, tell them **what changed in the code**, as a table: File | What changed (functions or components added, changed or removed; one row each). Keep it short, but never skip it.
 - They watch token use. Keep context small: old tool results are stubbed, reads are capped (8 per message).
 - After fixing a bug, add a regression test in `tests/` with a fixture.
@@ -40,7 +40,7 @@ Before saying something is done: `npm test` and `npm run typecheck` must both pa
 
 ## Stack
 
-Electron 45 (Node 24, `node:sqlite`), electron-vite, Vite, React 19, TypeScript 7 (`tsgo`; the classic compiler API is unavailable, so `ts5` = `npm:typescript@5.9` is used only for parsing in the Map), Tailwind v4, shadcn/ui (Radix), lucide, Geist fonts, React Flow + dagre (Map), Mermaid (diagrams).
+Electron 45 (Node 24, `node:sqlite`), electron-vite, Vite, React 19, TypeScript 7 (`tsgo`; the classic compiler API is unavailable, so `ts5` = `npm:typescript@5.9` is used only for parsing in the Map), Tailwind v4, shadcn/ui (Radix), lucide, Geist fonts, React Flow + dagre (Map), Mermaid (diagrams), Excalidraw (whiteboard).
 
 - `package.json` is `"type": "module"`. The preload builds to CJS `index.cjs` (sandboxed). Main uses `import.meta.dirname`.
 - Theme: Mantine-style dark greys with a maroon primary (`#8B1E2D`, lines `#C0394B`, text tint `#F1A2AB`). Use the tokens (`bg-chrome`, `border-divider`, `text-heading`, `text-brand-text`, `border-brand-line`), not hex values.
@@ -65,7 +65,8 @@ src/
       ai-extensions.ts    which editor extensions and settings are AI (same rule as ide/vscode/ai-block.js)
       editor-import.ts    "Bring your VS Code": what comes over, swaps, FORCED_SETTINGS (no AI, names-only autocomplete)
       jsonc.ts            VS Code's commented JSON
-    ports/                interfaces only: ProjectFiles, Animator, CodeMapper, ProjectScanner, SessionStore, EditorFeed, Terminals
+      task-check.ts       Check my answer: does their last run print the coach's answer (fixed rules, never the model)
+    ports/                interfaces only: ProjectFiles, CodeMapper, ProjectScanner, SessionStore, EditorFeed, Terminals
     adapters/             the outside world (implements ports)
       fs-readonly.ts      resolveInside: the gate for every path the coach reads in the learner's project
       providers.ts        pi-ai providers (all 42), settings.json (model, profile, skills)
@@ -80,22 +81,23 @@ src/
     engines/              work the coach and tabs use (implements ports)
       project.ts          detectProject / detectFiles (any folder; git optional), SKIP_DIRS
       map/                code map: python-analyzer (ast), ts-analyzer (ts5), curly-analyzer (Java/C#/…), build-map, docs, doc-examples, code-skills
-      visualize/          Python animator: runner (temp copy + sandbox, pythonFiles), tracer-source (sys.settrace), scenario
+      python.ts           which Python: the project's venv or the system's (Map analyzer, ▶ Run)
     coach/                the conversation
       coach.ts            pi-durable setup: extension (sections, tools, hooks), events → display, send/abort, recovery
       turn.ts             per-turn state from the transcript: intent tag, redo counts, read budget, typed tool names
       request.ts          each request: stubs, withheld code replies, the per-turn note, cache settings
       replay.ts           chat items, usage and last marked step rebuilt from the transcript
       prompts.ts          coach prompt, learner section + learner-now note, idea mode, intents, hidden redo messages
-      tools/              read (list/read/search), cards (ask_question, show_diagram, point_to_code, show_step, animate_code), outline, skill (note_skill), progress (track_progress)
+      tools/              read (list/read/search), cards (ask_question, show_diagram, point_to_code, show_step, draw_board), outline, skill (note_skill), tasks (set_task)
     services/
       workspace.ts        one live Coach per open session
-      editor-link.ts      ties the editor to the open session: marker, meters, status line
+      editor-link.ts      ties the editor to the open session: marker, feeling, status line
+      tasks.ts            a session's tasks: the learner's and the coach's, Check my answer, copies for Send
       editor-context.ts   what the coach sees of the editor
     ipc/                  index.ts builds everything; ports.ts plugs the real ports in (realPorts, also used by tests);
-                          one file per area (coach, workspace, editor, code, vscode, visualize, map, settings); vscode.ts is the
+                          one file per area (coach, workspace, editor, code, vscode, map, settings); vscode.ts is the
                           Code tab's VS Code and the import; code.ts + code-area.ts + editor-runs.ts are ▶ Run
-  preload/                exposes window.bettercoder / workspace / harness / visualize / codeMap / code / ide / editorImport
+  preload/                exposes window.bettercoder / workspace / harness / codeMap / code / ide / editorImport
   shared/                 types and IPC channel names shared by main and renderer (profile.ts, harness.ts, workspace.ts, code.ts, ide.ts, editor-import.ts, …)
   renderer/src/
     app.tsx               shell: onboarding → Home or session; sidebar toggle (⌘B)
@@ -104,8 +106,10 @@ src/
       home/               Home: open folder/files, start from an idea, recent sessions
       shell/              title bar, sidebar + rail, session bar, tabs (layoutSections), composer
       code/               the Code tab: vscode-frame.tsx (VS Code in a frame, "Pick a folder" for ideas)
-      coach/              coach-pane.tsx (the coach beside the editor: meters row + one chat), chat, cards, meters
-      visualize/ map/ sources/ settings/ workspace/ project/
+      coach/              coach-pane.tsx (the coach beside the editor: feeling row + one chat), chat, cards, meters
+      tasks/              tasks-tab.tsx (the Tasks tab, Ask about this, notifications over the coach), send-tasks.tsx
+      visualize/          the whiteboard: board-player (steps, play), board-canvas (Excalidraw, lazy), board-elements (look, camera)
+      map/ sources/ settings/ workspace/ project/
 ide/vscode/               the BetterCoder extension inside VS Code (plain CommonJS, no build): extension.js, ghost.js, notebook-view.js,
                           ai-block.js (pure, tested), themes/bettercoder-dark.json
 tests/                    *.test.ts plus fixtures/ (read-only sample projects)
@@ -115,7 +119,7 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 
 - **Project → Session → tabs (Coach, Visualize, Map, Sources).** Map belongs to the project; Coach and Sources to the session.
 - Project kinds: `folder`, `files` (individually opened), `idea` (no folder yet, `root: ''`).
-  - Idea projects get only the card tools that need no files (including `animate_example`).
+  - Idea projects get only the card tools that need no files (including `draw_board`).
   - **Link folder** gives the project a root; its sessions carry on.
 - Stored in Electron `userData`: `projects/<id>/project.json`, `projects/<id>/sessions/<sid>.json` (meta), `projects/<id>/sessions/<sid>.sqlite` (pi-durable conversation, one file per session).
 - Learner profile (`shared/profile.ts`): skills, style chips, and their own words (fenced in the prompt; it can never lift the no-code rule). Style and own words are a pi-durable section; levels and card use ride on the newest message as a "learner now" note (never stored). Both apply from the next message.
@@ -149,8 +153,9 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 - It talks to the app over a Unix socket in `~/.bettercoder` (folder 0700), one JSON message per line (`shared/ide.ts`). VS Code sends: hello, editor (file, cursor), doc (text), diagnostics, step_done, step_typed, and ▶ Run's run / term_input / term_resize / term_stop. The app sends: anchor, clear, status, open ("Open in editor"; held until VS Code connects), term (run output and end), run_error (with an install link), problems.
 - Notebooks are reported in the coach's own view (`ide/vscode/notebook-view.js`, kept identical to `core/text-view.ts` by a test): editor lines, markers and "Open in editor" lines are view lines, mapped to cells by the extension.
 - The coach sees the editor through `services/editor-context.ts`, added to the newest learner message on each request and **never stored**. Same rules as the tools: project files only, no secret files, secrets redacted.
-- `show_step` takes `at` (file, line). The editor marks that line and shows the step's pseudocode as an `after` decoration, one line at a time (`ghost.js`). It is never inline-completion ghost text, because Tab would write it into their file.
-- Meters: progress comes from `track_progress` (stored, so it is rebuilt from the transcript). Feeling comes from editor activity only (`core/feeling.ts`), never from what the learner types. Stuck shows "Get a hint" and a typed-out step shows "Next step"; both send existing intents.
+- `show_step` takes `at` (file, line). The editor puts a label above that line (a CodeLens: "◆ step title · See the official line (Method)"); nothing is drawn in their text (no tint, no faded pseudocode: the user removed both, 2026-11-10). The official line is for the pseudocode line they are on (`ghost.js` counts typed lines; the pseudocode itself is never shown). Clicking it asks the app (`official` message), which fetches the example from the official-docs allowlist (`engines/map/doc-examples.ts`, `editorExample`) and the editor opens it in a read-only peek under the line with the method's line lit. It never comes from the model, and the model never sees it.
+- Tasks (no progress bar): a session's tasks, added by the learner or the coach (`set_task`), kept in `<sessionId>.tasks` beside the session. Each has "done when" (inputs, in words) and the coach's answer, sealed: never shown to the learner or put back in front of the coach until it matched. A learner's own task waits until the coach writes its check (the `task` intent). Check my answer compares their last ▶ Run with the answer in `core/task-check.ts` (numbers by value, text ignoring case and spacing), never the model. The coach sees the tasks on the newest message only (`forCoach`, never stored). Tasks are a tab beside Code (locked in ideas), so the chat stays free; notifications show over the top of the coach (View opens the tab). "Ask about this" puts the task on the composer as a chip, and their own words go to the coach as "About my task “…”: …". Send copies tasks, fresh, into a new or existing session of the same project. A session from before Tasks (no `.tasks` file) brings its old `track_progress` list over once, as the coach's tasks waiting for checks; with no tasks the coach is reminded to add them.
+- Feeling comes from editor activity only (`core/feeling.ts`), never from what the learner types. Stuck shows "Get a hint" and a typed-out step shows "Next step"; both send existing intents.
 
 ## ▶ Run notes
 
@@ -159,16 +164,8 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 - Output, the plain-words line (`core/error-words.ts`) and underlines (`core/run-errors.ts`) come from the run, never the model. The coach sees only the last run (`core/run-view.ts`, newest message, never stored).
 - node-pty is N-API (works under Node and Electron with no rebuild); `scripts/fix-node-pty.mjs` makes its `spawn-helper` executable after install.
 
-## Animator notes
+## Whiteboard notes
 
-- Python only for now (code and hidden examples). Other languages need their own tracer: a later stage.
-
-- The animator runs only Python and notebooks. It uses the nearest `.venv` / `venv` / `env` from the file up to the root, otherwise `python3`.
-- Every folder from the file's folder up to the root goes on `sys.path`. Packages are loaded under their dotted name.
-- A whole-file run executes `__main__`. `input()` stops cleanly.
-- Notebooks run cell by cell: a cell that fails to parse is skipped and reported.
-- Limits:
-  - 400 steps.
-  - The process is killed after 30s, or 45s on the first matplotlib run (it builds a font cache).
-  - The tracer stops itself 3 seconds before that.
-- The `is_user` check is cached per file, because a realpath on every call made torch imports 10× slower.
+- Visualize is the whiteboard: every board the coach drew in the session, full size (pan and zoom); with none, "Ask the coach to draw it" (the `visualize` intent). Chat cards show the same board small and not interactive.
+- The Visualize button restricts the coach to reading, `ask_question` and `draw_board`; a reply in words is nudged once to draw (`VISUALIZE_NUDGE`).
+- Excalidraw runs in its light theme on the app's grey (its dark theme inverts canvas colours); its menus are hidden (`.bc-board` in globals.css). The camera frames the board's last step, so it never moves while playing; new things fade in.

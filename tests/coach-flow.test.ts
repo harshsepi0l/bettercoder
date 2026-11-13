@@ -25,16 +25,16 @@ const project: ProjectInfo = {
 type Req = { messages: Array<{ role: string; toolsAdded?: Array<{ name: string }> }> }
 const offered = (ctx: unknown) => (ctx as Req).messages.flatMap((m) => (m.role === 'system' ? (m.toolsAdded ?? []).map((t) => t.name) : []))
 
-test('a C# project is not offered the Python animator, and the prompt does not mention it', async () => {
+test('a C# project is offered the whiteboard (it needs no runner), and the prompt names it', async () => {
   const { faux, session } = await openCoach(project)
   const seen: unknown[] = []
   faux.setResponses([(ctx) => (seen.push(ctx), fauxAssistantMessage('**Start with input**'))])
   await session.send('What should I do next?', 'next')
   await session.waitForIdle()
-  assert.ok(offered(seen[0]).includes('show_diagram'))
-  assert.ok(!offered(seen[0]).includes('animate_code'))
-  assert.doesNotMatch(coachPrompt(project, false), /animate_code/)
-  assert.match(coachPrompt(project, true), /animate_code/)
+  assert.ok(offered(seen[0]).includes('draw_board'))
+  assert.ok(!offered(seen[0]).some((t) => t.startsWith('animate_')))
+  assert.match(coachPrompt(project), /draw_board/)
+  assert.doesNotMatch(coachPrompt(project), /animate_/)
 })
 
 test('cards and a question in one reply wait for the learner', async () => {

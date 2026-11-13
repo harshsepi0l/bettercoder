@@ -1,11 +1,12 @@
 import type { ToolResultMessage } from '@earendil-works/pi-ai'
+import type { StepOfficial } from '../../shared/ide'
 import { type EntryRecord } from '@earendil-works/pi-durable'
 import type { Card } from '../../shared/cards'
 import type { ChatItem } from '../../shared/chat'
 import type { TurnUsage } from '../../shared/harness'
 import { TOOL_TEXT_REQUEST } from './prompts'
 import { VISUAL_TOOL_NAMES } from './tools/cards'
-import { ANIMATE_TOOLS, HIDDEN_PREFIX, READ_TOOLS, stripIntent, textOf, withoutToolNames, hasCode } from './turn'
+import { HIDDEN_PREFIX, READ_TOOLS, stripIntent, textOf, withoutToolNames, hasCode } from './turn'
 
 /**
  * Rebuilding what the learner saw from the stored transcript: the chat items, usage, and the last marked step.
@@ -19,6 +20,7 @@ export function describeTool(name: string, args: Record<string, unknown> | undef
       return { label: 'Listed', detail: String(args?.path ?? '.') }
     case 'search':
       return { label: 'Searched', detail: `"${String(args?.query ?? '')}"` }
+    // From the old animator: past sessions still show these lines.
     case 'animate_code':
       return { label: 'Running', detail: String(args?.file ?? '') }
     case 'animate_example':
@@ -32,7 +34,7 @@ export function describeTool(name: string, args: Record<string, unknown> | undef
 
 /** Shows as a tool line in the chat (cards appear as cards instead). */
 export function isToolLine(name: string): boolean {
-  return READ_TOOLS.has(name) || ANIMATE_TOOLS.has(name)
+  return READ_TOOLS.has(name) || name === 'animate_code' || name === 'animate_example'
 }
 
 /** The chat as the learner saw it, rebuilt from the stored transcript. */
@@ -107,17 +109,40 @@ export function sumUsage(state: { models: Record<string, { input: number; output
   return out
 }
 
-/** A step with a place in their file: the editor marks the line and shows the pseudocode there, faded. */
+/** A step with a place in their file: the editor labels that line and offers each tagged line's official line. */
 export interface AnchoredStep {
   id: string
   path: string
   line: number
+  title: string
   ghost: string[]
+  /** Per pseudocode line: the method whose official line the editor can show. */
+  official: Array<StepOfficial | null>
 }
 
 export function anchoredStep(id: string, card: Card | undefined): AnchoredStep | null {
   if (card?.kind !== 'step' || !card.anchor || card.lines.length === 0) return null
-  return { id, path: card.anchor.path, line: card.anchor.line, ghost: card.lines.map((l) => l.text) }
+  return {
+    id,
+    path: card.anchor.path,
+    line: card.anchor.line,
+    title: card.title,
+    ghost: card.lines.map((l) => l.text),
+    official: card.lines.map((l) => (l.method && l.docUrl ? { method: l.method, docUrl: l.docUrl } : null))
+  }
+}
+
+/**
+ * Task titles from the old progress meter (`track_progress`, before Tasks): the newest list in a stored transcript.
+ * Sessions from then carry them over once, as tasks waiting for the coach to write their checks.
+ */
+export function legacyTaskTitles(entries: readonly EntryRecord[]): string[] {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const m = entries[i].model?.[0] as { role?: string; toolName?: string; isError?: boolean; details?: { tasks?: Array<{ title?: unknown }> } } | undefined
+    if (m?.role !== 'toolResult' || m.toolName !== 'track_progress' || m.isError || !Array.isArray(m.details?.tasks)) continue
+    return m.details.tasks.map((t) => (typeof t?.title === 'string' ? t.title.trim() : '')).filter(Boolean)
+  }
+  return []
 }
 
 /** The newest step card in a stored transcript, if it has a place (restart-safe: the marker comes back). */
