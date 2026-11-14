@@ -1,4 +1,3 @@
-import type { Trace, TraceValue } from '../../shared/trace'
 
 /**
  * The no-code guard. Every piece of assistant text passes through here before
@@ -29,6 +28,18 @@ const CODE_START =
 
 const INDENTED = /^(?: {4}|\t)/
 
+/** Small words of ordinary sentences: code never has them after a keyword ("using the result" is English). */
+const SENTENCE_WORDS = /\s(?:the|a|an|to|of|it|its|that|this|your|their|is|are|was|when|so|and|or|with|into|from|every|each|until|then|before|after|never|not|no|only|still|also|just)\b|\w's\b|[—–]/
+
+/**
+ * A line that starts with a code keyword but reads as a sentence: "using the TryParse result", "return the total to
+ * the caller", "using TryParse's flag", "return leaves — the rest never runs". No code symbols, at least three words, and
+ * something only sentences have (a small word like "the", a possessive, a dash).
+ */
+function keywordProse(t: string): boolean {
+  return /^[a-z]+\s/.test(t) && !/[;{}()=<>[\]"`+*/%]|\s-\s|'(?!s\b)/.test(t) && t.split(/\s+/).length >= 3 && SENTENCE_WORDS.test(t)
+}
+
 /** Inline code that only names something is fine: an identifier, a file path, a short command. */
 const SAFE_INLINE = /^[A-Za-z0-9_.\/\\:@#+\- ]{1,60}$/
 
@@ -51,7 +62,7 @@ export function looksLikeCodeStart(prefix: string): boolean {
 export function isCodeLine(line: string): boolean {
   const t = stripListMarker(line).trim()
   if (t.length === 0) return false
-  if (CODE_START.test(t)) return true
+  if (CODE_START.test(t)) return !keywordProse(t)
   if (/^[{}()[\];]+;?$/.test(t)) return true
   if (/[;{]\s*$/.test(t) && /[(=]/.test(t)) return true
   if (/\)\s*:\s*$/.test(t) && /\(/.test(t)) return true // def foo(x):
@@ -206,7 +217,7 @@ export function pseudocodeProblem(line: string): string | null {
 
 /**
  * A printed or stored value, not code: a number, text, or a list / dict / set / tuple of them, as Python or JSON
- * prints it ("[1, 2, 3]", "{'a': 1}", "(3, 'x')", "True"). Used for what a hidden example shows (regression: a printed
+ * prints it ("[1, 2, 3]", "{'a': 1}", "(3, 'x')", "True"). Used for values on the whiteboard (regression: a printed
  * "[1, 2, 3]" was refused as code).
  */
 export function isDataLiteral(line: string): boolean {
@@ -215,26 +226,4 @@ export function isDataLiteral(line: string): boolean {
   // Quoted text becomes a placeholder; what is left may only be numbers, words for constants, and brackets.
   const rest = t.replace(/b?'(?:[^'\\]|\\.)*'|b?"(?:[^"\\]|\\.)*"/g, 'S').replace(/\b(True|False|None|true|false|null)\b/g, 'S')
   return /^[\s\d.eE+\-S[\]{}(),:]+$/.test(rest) && !/\d\s+\d/.test(rest.replace(/\s*[,:]\s*/g, ','))
-}
-
-/**
- * What a hidden example shows the learner (printed output and text values) must be data, not code: the coach's
- * example code never leaves the main process, so it may not sneak out through a print. Printed values like
- * [1, 2, 3] are data.
- */
-export function exampleProblem(trace: Trace): string | null {
-  const lines = new Set<string>()
-  const visit = (v: TraceValue) => {
-    if (v.t === 'str') for (const l of v.v.split('\n')) lines.add(l.trim())
-    else if (v.t === 'list') v.items.forEach(visit)
-    else if (v.t === 'dict') v.entries.forEach(([k, x]) => (visit(k), visit(x)))
-    else if (v.t === 'obj') v.fields.forEach(([, x]) => visit(x))
-  }
-  for (const s of trace.steps) {
-    for (const f of s.frames) for (const [, v] of f.locals) visit(v)
-    if (s.returnValue) visit(s.returnValue)
-  }
-  for (const l of (trace.steps.at(-1)?.output ?? '').split('\n')) lines.add(l.trim())
-  for (const t of lines) if (t && isCodeLine(t) && !isDataLiteral(t)) return `The example shows code to the learner ("${t.slice(0, 80)}"). Print and keep data only, in plain values.`
-  return null
 }

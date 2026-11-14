@@ -52,6 +52,14 @@ export class EditorRuns {
     }
   }
 
+  /** A step's Check started a run: the editor shows it in its "▶ Check" terminal, with its output. */
+  followCheck(run: RunSummary, label: string): void {
+    const root = this.root()
+    if (!root) return
+    this.ids.add(run.id)
+    this.send({ type: 'check_run', file: join(root, run.path), runId: run.id, label })
+  }
+
   /** A terminal event from the hub: passed on when it belongs to a run the editor started. */
   event(e: TerminalEvent): void {
     const id = e.type === 'run' ? e.run.id : e.id

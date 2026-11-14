@@ -2,11 +2,11 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC, type BetterCoderApi } from '../shared/ipc'
 import { HARNESS_IPC, type AuthUiEvent, type HarnessApi, type HarnessEvent } from '../shared/harness'
 import { WORKSPACE_IPC, type WorkspaceApi } from '../shared/workspace'
-import { VISUALIZE_IPC, type VisualizeApi } from '../shared/visualize'
 import { MAP_IPC, type MapApi } from '../shared/map'
 import { IDE_IPC, type IdeApi, type IdeView } from '../shared/ide'
 import { EDITOR_IMPORT_IPC, type EditorImportApi } from '../shared/editor-import'
 import { CODE_IPC, type CodeApi } from '../shared/code'
+import { TASKS_IPC, type TasksApi, type TasksUpdate } from '../shared/tasks'
 
 const api: BetterCoderApi = {
   platform: process.platform,
@@ -20,7 +20,7 @@ function listen<T>(channel: string, listener: (value: T) => void): () => void {
 }
 
 const harness: HarnessApi = {
-  send: (text, intent) => ipcRenderer.invoke(HARNESS_IPC.send, text, intent),
+  send: (text, intent, mode) => ipcRenderer.invoke(HARNESS_IPC.send, text, intent, mode),
   abort: () => ipcRenderer.invoke(HARNESS_IPC.abort),
   cardUse: (kind) => ipcRenderer.invoke(HARNESS_IPC.cardUse, kind),
   onEvent: (listener) => listen<HarnessEvent>(HARNESS_IPC.event, listener),
@@ -44,15 +44,10 @@ const workspace: WorkspaceApi = {
   newSession: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.newSession, projectId),
   openSession: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.openSession, sessionId),
   renameSession: (sessionId, title) => ipcRenderer.invoke(WORKSPACE_IPC.renameSession, sessionId, title),
+  clearChat: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.clearChat, sessionId),
   deleteSession: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.deleteSession, sessionId),
   deleteProject: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.deleteProject, projectId),
   onChanged: (listener) => listen<void>(WORKSPACE_IPC.changed, () => listener())
-}
-
-const visualize: VisualizeApi = {
-  files: () => ipcRenderer.invoke(VISUALIZE_IPC.files),
-  outline: (file) => ipcRenderer.invoke(VISUALIZE_IPC.outline, file),
-  run: (file, scenario) => ipcRenderer.invoke(VISUALIZE_IPC.run, file, scenario)
 }
 
 const codeMap: MapApi = {
@@ -69,6 +64,16 @@ const ide: IdeApi = {
   onShowCode: (listener) => listen<void>(IDE_IPC.showCode, () => listener())
 }
 
+const tasks: TasksApi = {
+  list: () => ipcRenderer.invoke(TASKS_IPC.list),
+  onChanged: (listener) => listen<TasksUpdate>(TASKS_IPC.changed, listener),
+  add: (title) => ipcRenderer.invoke(TASKS_IPC.add, title),
+  remove: (id) => ipcRenderer.invoke(TASKS_IPC.remove, id),
+  check: (id) => ipcRenderer.invoke(TASKS_IPC.check, id),
+  send: (ids, target) => ipcRenderer.invoke(TASKS_IPC.send, ids, target),
+  checkStep: (title, checks, path, of) => ipcRenderer.invoke(TASKS_IPC.checkStep, title, checks, path, of)
+}
+
 const code: CodeApi = {
   vscodeUrl: () => ipcRenderer.invoke(CODE_IPC.vscodeUrl)
 }
@@ -82,9 +87,9 @@ const editorImport: EditorImportApi = {
 }
 
 contextBridge.exposeInMainWorld('code', code)
+contextBridge.exposeInMainWorld('tasks', tasks)
 contextBridge.exposeInMainWorld('editorImport', editorImport)
 contextBridge.exposeInMainWorld('ide', ide)
 contextBridge.exposeInMainWorld('codeMap', codeMap)
-contextBridge.exposeInMainWorld('visualize', visualize)
 contextBridge.exposeInMainWorld('workspace', workspace)
 contextBridge.exposeInMainWorld('harness', harness)

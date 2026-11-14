@@ -1,13 +1,18 @@
 import { join } from 'node:path'
 import type { Api, Model, Models } from '@earendil-works/pi-ai'
 import { titleFrom } from '../../shared/chat'
-import type { CardUse, CoachIntent, HarnessEvent } from '../../shared/harness'
+import type { CardUse, CoachIntent, CoachMode, HarnessEvent } from '../../shared/harness'
 import type { OpenSession, ProjectSummary } from '../../shared/workspace'
 import type { ProjectInfo } from '../../shared/ipc'
 import type { LearnerProfile, Skill } from '../../shared/profile'
 import { Coach } from '../coach/coach'
 import type { CoachPorts, ProjectScanner, SessionRecord, SessionStore } from '../ports'
 import type { IdeHub } from './editor-link'
+import { SessionTasks } from './tasks'
+import type { RunSummary } from '../../shared/code'
+import type { SendTarget, TaskCheck, TasksUpdate } from '../../shared/tasks'
+import { cleanChecks, stepKey, type CheckResult, type RunCheck, type StepOfTask, type StepRun } from '../../shared/step-checks'
+import { gradeCheck } from '../core/step-check'
 
 /** A short project name from an idea: its first few words. */
 export function ideaName(idea: string): string {
@@ -22,7 +27,14 @@ export function ideaName(idea: string): string {
  * SQLite file; this keeps only titles and timestamps.
  */
 export class WorkspaceController {
-  private active: { record: SessionRecord; coach: Coach; open: OpenSession } | null = null
+  private active: {
+    record: SessionRecord
+    coach: Coach
+    open: OpenSession
+    tasks: SessionTasks
+    /** Resolves once every task change so far is on disk (closing waits for it, so a reopen never reads a stale file). */
+    saved: () => Promise<unknown>
+  } | null = null
   /** Serialises opening/closing, so two quick clicks can't open two harnesses on one file. */
   private chain: Promise<unknown> = Promise.resolve()
 
@@ -44,6 +56,8 @@ export class WorkspaceController {
       ide?: IdeHub
       /** A session closed (or another one opened): end what belonged to it, such as its terminals. */
       closed?: (sessionId: string) => void
+      /** The open session's tasks changed (or another session opened). */
+      tasksChanged?: (update: TasksUpdate) => void
     }
   ) {}
 
@@ -160,6 +174,40 @@ export class WorkspaceController {
     this.deps.changed()
   }
 
+  /**
+   * Clear chat: the open session starts its conversation fresh (the coach forgets it, so the next message is cheap).
+   * Its title, tasks and running ▶ Run programs stay. pi-durable has no delete, so the coach is closed, its files
+   * removed and it opens anew, all in one step; the session always opens again, even when clearing failed.
+   */
+  clearChat(sessionId: string): Promise<OpenSession> {
+    return this.serial(async () => {
+      const active = this.active
+      if (active?.record.id !== sessionId) throw new Error('Open that session first.')
+      const record = active.record
+      await active.coach.abort().catch(() => undefined)
+      await this.closeActive(false, { keepRuns: true })
+      let failed: unknown = null
+      try {
+        await this.store.clearConversation(record)
+        // Sessions from before pi-durable kept their chat on the record.
+        delete record.items
+        await this.store.saveSession(record)
+      } catch (e) {
+        failed = e
+      }
+      let open: OpenSession
+      try {
+        open = await this.openNow(record)
+      } catch (e) {
+        // Could not open it again: say so, rather than leave the window showing a session that is gone.
+        this.deps.emit({ type: 'session_closed' })
+        throw e
+      }
+      if (failed) throw new Error(`The chat could not be cleared: ${failed instanceof Error ? failed.message : String(failed)}`)
+      return open
+    })
+  }
+
   deleteSession(sessionId: string): Promise<void> {
     return this.serial(async () => {
       if (this.active?.record.id === sessionId) await this.closeActive(true)
@@ -176,7 +224,79 @@ export class WorkspaceController {
     })
   }
 
-  async send(text: string, intent?: CoachIntent): Promise<void> {
+  /** The open session's tasks, as the panel sees them. */
+  tasks(): TasksUpdate {
+    const a = this.active
+    return a ? { sessionId: a.record.id, tasks: a.tasks.view(), steps: a.tasks.runs() } : { sessionId: null, tasks: [] }
+  }
+
+  /** The learner adds a task: it waits until the coach writes how to check it (the panel then asks the coach). */
+  addTask(title: string): void {
+    const a = this.active
+    if (!a) throw new Error('Open a session first.')
+    a.tasks.addMine(title)
+  }
+
+  removeTask(id: string): void {
+    this.active?.tasks.remove(id)
+  }
+
+  /** Check my answer: their last ▶ Run against the coach's answer. */
+  checkTask(id: string, run: RunSummary | null): TaskCheck {
+    const a = this.active
+    if (!a) throw new Error('Open a session first.')
+    return a.tasks.check(id, run)
+  }
+
+  /**
+   * Check a step card: its file runs once per check with that check's inputs typed in (`runOne`, the ▶ Run machinery,
+   * shown in their editor), and each expectation is graded by fixed rules (core/step-check.ts). The coach never runs
+   * anything and is not asked.
+   */
+  async checkStep(
+    title: string,
+    checks: readonly RunCheck[],
+    path: string,
+    of: StepOfTask | null,
+    runOne: (path: string, inputs: readonly string[], label: string) => Promise<{ run: RunSummary; timedOut: boolean }>
+  ): Promise<StepRun> {
+    const a = this.active
+    if (!a) throw new Error('Open a session first.')
+    const clean = cleanChecks(checks)
+    if (clean.length === 0) throw new Error('This step has nothing to check.')
+    const results: CheckResult[] = []
+    for (const [i, c] of clean.entries()) {
+      const { run, timedOut } = await runOne(path, c.inputs, `Check ${i + 1} of ${clean.length}`)
+      results.push(...gradeCheck(c, run, timedOut))
+      // Another session opened meanwhile: the rest belongs to nobody.
+      if (this.active !== a) throw new Error('The session changed while checking.')
+    }
+    const done: StepRun = { at: Date.now(), results, passed: results.every((r) => r.pass) }
+    a.tasks.recordStep(stepKey(title, clean), done, of)
+    return done
+  }
+
+  /** Copy tasks (fresh, not done) into a new or existing session of this project, then open it. */
+  async sendTasks(ids: readonly string[], target: SendTarget): Promise<OpenSession> {
+    const a = this.active
+    if (!a) throw new Error('Open a session first.')
+    const copies = a.tasks.copies(ids)
+    if (copies.length === 0) throw new Error('Pick at least one task.')
+    let record: SessionRecord | null
+    if (target.kind === 'new') {
+      record = await this.store.createSession(a.record.projectId)
+    } else {
+      record = await this.store.getSession(target.sessionId)
+      if (!record || record.projectId !== a.record.projectId) throw new Error('Pick a session of this project.')
+      if (record.id === a.record.id) throw new Error('These tasks are already in this session.')
+    }
+    const there = new SessionTasks((await this.store.loadTasks(record)) ?? [], () => undefined, () => undefined)
+    there.append(copies)
+    await this.store.saveTasks(record, there.all())
+    return this.activate(record)
+  }
+
+  async send(text: string, intent?: CoachIntent, mode?: CoachMode): Promise<void> {
     const active = this.active
     if (!active) {
       this.deps.emit({ type: 'error', message: 'Open a folder or files first.' })
@@ -187,7 +307,7 @@ export class WorkspaceController {
     if (active.record.title === 'New session') active.record.title = titleFrom(text)
     await this.store.saveSession(active.record)
     this.deps.changed()
-    await active.coach.send(text, intent)
+    await active.coach.send(text, intent, mode)
   }
 
   abort(): void {
@@ -199,21 +319,29 @@ export class WorkspaceController {
     return this.serial(() => this.closeActive(false))
   }
 
-  private async closeActive(deleting: boolean): Promise<void> {
+  private async closeActive(deleting: boolean, opts: { keepRuns?: boolean } = {}): Promise<void> {
     if (!this.active) return
-    const { coach, record } = this.active
+    const { coach, record, saved } = this.active
     // The record is saved wherever it changes (send, rename); the timestamp moves only on send, so leaving a
     // session never reorders the sidebar.
     if (deleting) await coach.abort().catch(() => undefined)
     this.active = null
     this.deps.ide?.setSession(null)
-    this.deps.closed?.(record.id)
+    this.deps.tasksChanged?.({ sessionId: null, tasks: [] })
+    // Clear chat reopens the same session at once: its ▶ Run programs and last run stay.
+    if (!opts.keepRuns) this.deps.closed?.(record.id)
     await coach.close().catch(() => undefined)
+    await saved().catch(() => undefined)
     if (deleting) this.deps.emit({ type: 'session_closed' })
   }
 
   private activate(record: SessionRecord): Promise<OpenSession> {
-    return this.serial(async () => {
+    return this.serial(() => this.openNow(record))
+  }
+
+  /** Open a session (inside serial only). */
+  private async openNow(record: SessionRecord): Promise<OpenSession> {
+    {
       const project = await this.store.getProject(record.projectId)
       if (!project) throw new Error('That project is no longer known.')
       const mustExist = !project.root ? [] : project.files ? project.files.map((f) => join(project.root, f)) : [project.root]
@@ -227,6 +355,21 @@ export class WorkspaceController {
           ? await this.deps.ports.scanner.scanFiles(project.files.map((f) => join(project.root, f)))
           : await this.deps.ports.scanner.scanFolder(project.root)
       const info: ProjectInfo = project.idea ? { ...detected, idea: project.idea } : detected
+      // The session's tasks: saved one after another (never two writes racing), shown and put on the status line.
+      let saving: Promise<unknown> = Promise.resolve()
+      const stored = await this.store.loadTasks(record)
+      const tasks: SessionTasks = new SessionTasks(
+        stored ?? [],
+        (list) => {
+          const copy = [...list]
+          saving = saving.then(() => this.store.saveTasks(record, copy)).catch(() => undefined)
+        },
+        (notice) => {
+          if (this.active?.record.id !== record.id) return
+          this.deps.ide?.setTaskLine(tasks.statusLine())
+          this.deps.tasksChanged?.({ sessionId: record.id, tasks: tasks.view(), steps: tasks.runs(), ...(notice ? { notice } : {}) })
+        }
+      )
       const coach = await Coach.open(
         this.store.sessionDbFile(record),
         info,
@@ -242,11 +385,12 @@ export class WorkspaceController {
           onStep: (step) => {
             if (this.active?.record.id === record.id) this.deps.ide?.setStep(step)
           },
-          onProgress: (tasks) => {
-            if (this.active?.record.id === record.id) this.deps.ide?.setProgress(tasks)
-          }
+          setTask: (task) => tasks.coachSet(task),
+          tasksContext: () => tasks.forCoach()
         }
       )
+      // A session from before Tasks: its old progress meter's tasks come over once, for the coach to write checks.
+      if (stored === null && coach.legacyTasks.length > 0) tasks.importLegacy(coach.legacyTasks)
       // Sessions from before pi-durable keep their old chat on screen (read-only history).
       const items = coach.initialItems.length > 0 ? coach.initialItems : (record.items ?? [])
       const open: OpenSession = {
@@ -261,15 +405,16 @@ export class WorkspaceController {
           usage: coach.initialUsage
         }
       }
-      this.active = { record, coach, open }
-      this.deps.ide?.setSession(info.root ? { root: info.root, files: info.files } : null, coach.initialProgress, coach.initialStep)
+      this.active = { record, coach, open, tasks, saved: () => saving }
+      this.deps.ide?.setSession(info.root ? { root: info.root, files: info.files } : null, tasks.statusLine(), coach.initialStep)
+      this.deps.tasksChanged?.({ sessionId: record.id, tasks: tasks.view(), steps: tasks.runs() })
       this.deps.emit({ type: 'session_opened', open })
       if (info.root) this.deps.opened?.(info)
       // session_opened resets the panel to idle; a run resumed on open must still show as busy.
       if (coach.isBusy) this.deps.emit({ type: 'busy', busy: true })
       this.deps.changed()
       return open
-    })
+    }
   }
 
   /** Events from a session's coach go to the panel only while it is the open one. */

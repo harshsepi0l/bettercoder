@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { fauxAssistantMessage, fauxToolCall } from '@earendil-works/pi-ai'
 import type { ProjectInfo } from '../src/shared/ipc'
 import { createOutlineTool } from '../src/main/coach/tools/outline'
-import { findPython } from '../src/main/engines/visualize/runner'
+import { findPython } from '../src/main/engines/python'
 import { openCoach } from './helpers'
 import { realPorts } from '../src/main/ipc/ports'
 

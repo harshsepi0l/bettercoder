@@ -1,6 +1,7 @@
 import { app, type BrowserWindow } from 'electron'
 import { HARNESS_IPC, type HarnessEvent } from '../../shared/harness'
 import { IDE_IPC } from '../../shared/ide'
+import { TASKS_IPC } from '../../shared/tasks'
 import { WORKSPACE_IPC } from '../../shared/workspace'
 import { IdeBridge } from '../adapters/ide-socket'
 import { currentModel, getProfile, loadSettings, models, noteSkill } from '../adapters/providers'
@@ -16,7 +17,7 @@ import type { IpcContext } from './context'
 import { registerEditorIpc } from './editor'
 import { registerMapIpc } from './map'
 import { registerSettingsIpc } from './settings'
-import { registerVisualizeIpc } from './visualize'
+import { registerTasksIpc } from './tasks'
 import { registerVscodeIpc } from './vscode'
 import { registerWorkspaceIpc } from './workspace'
 
@@ -56,16 +57,21 @@ export function registerHarness(getWindow: () => BrowserWindow | null): { flush(
         .catch(() => undefined),
     ide,
     // A session's terminals end with it, so no program keeps running unseen.
-    closed: (sessionId) => codeBox.code?.sessionClosed(sessionId)
+    closed: (sessionId) => codeBox.code?.sessionClosed(sessionId),
+    tasksChanged: (update) => getWindow()?.webContents.send(TASKS_IPC.changed, update)
   })
 
   const context: IpcContext = { getWindow, ready, workspace, ide }
   registerCoachIpc(context)
   registerWorkspaceIpc(context)
+  registerTasksIpc(context, () => codeBox.code ?? null)
   registerEditorIpc(context)
   codeBox.code = registerRuns(context, bridge)
-  registerVisualizeIpc(context)
-  registerMapIpc(context)
+  const map = registerMapIpc(context)
+  // "See the official line" above a step in VS Code: the official example, opened under that line.
+  bridge.onCommand((m) => {
+    if (m.type === 'official') void map.official(m.url, m.term).then((reply) => bridge.send(reply))
+  })
   registerSettingsIpc(context)
   const vscode = registerVscodeIpc(context)
 

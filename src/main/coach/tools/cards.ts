@@ -2,18 +2,17 @@ import { Type } from 'typebox'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import type { Card } from '../../../shared/cards'
 import { PART_PATTERN } from '../../../shared/line-parts'
-import { StreamGuard, exampleProblem, isCodeLine, pseudocodeProblem } from '../../core/guard'
+import { StreamGuard, isCodeLine, isDataLiteral, pseudocodeProblem } from '../../core/guard'
 import { redactSecrets } from '../../core/paths'
 import { viewLines } from '../../core/text-view'
-import { summarizeTrace } from '../../core/trace-summary'
-import type { Animator, ProjectFiles } from '../../ports'
-import type { Trace } from '../../../shared/trace'
-import { visibleSteps } from '../../../shared/example-steps'
+import type { ProjectFiles } from '../../ports'
+import { BOARD_LIMITS, boardProblem, boardTexts, type Board, type BoardItem } from '../../../shared/board'
+import { MAX_CHECKS, MAX_EXPECTS, MAX_INPUTS, cleanChecks } from '../../../shared/step-checks'
 
 /**
  * Tools that draw cards in the chat. They keep the coach visual and short:
  * a question to click, a diagram, the learner's own code with a line to look
- * at, a concept, or a short checklist.
+ * at, a step, or the whiteboard.
  */
 
 const MAX_REF_LINES = 15
@@ -68,12 +67,23 @@ export function cardProblem(card: Card): string | null {
         texts.push(...(l.parts ?? []).map((x) => x.says))
       }
       if (card.question) texts.push(card.question.question, ...card.question.options)
+      // What Check types in, and the words it looks for: values and plain words, never code.
+      for (const c of card.checks ?? []) {
+        for (const t of [...c.inputs, ...c.expect.flatMap((e) => (e.kind === 'prints' || e.kind === 'not_prints' ? [e.text] : []))]) {
+          if (t && !isDataLiteral(t) && (isCodeLine(t) || codeInText(t))) return `A check looks like code: "${t}". Use values and plain words.`
+        }
+      }
+      break
+    case 'board':
+      texts.push(card.title, card.note)
+      for (const t of boardTexts(card.board)) if (!isDataLiteral(t) && (isCodeLine(t) || codeInText(t))) return `The board shows code: "${t}". Use plain words and values.`
       break
     case 'animation':
-      texts.push(card.title, card.note) // the trace is their own code, actually run
+      texts.push(card.title, card.note)
       break
   }
-  for (const t of texts) if (t && codeInText(t)) return 'That card contained code. Say it in plain words instead.'
+  // Name the words, so the coach can fix them in one go instead of guessing.
+  for (const t of texts) if (t && codeInText(t)) return `That card contained code: "${t.slice(0, 80)}". Say it in plain words instead.`
   return null
 }
 
@@ -82,11 +92,10 @@ function shown(card: Card, extra = '') {
 }
 
 /**
- * The card tools. `fs` (read-only project access) and `animator` come in as ports, so these never touch files or
- * processes themselves.
+ * The card tools. `files` (read-only project access) comes in as a port, so these never touch files themselves.
  */
 export function createVisualTools(
-  ports: { files: ProjectFiles; animator: Animator },
+  ports: { files: ProjectFiles },
   root: string,
   files: string[] | undefined
 ): AgentTool<any>[] {
@@ -212,9 +221,33 @@ export function createVisualTools(
           path: Type.String({ description: 'File relative to the project root' }),
           line: Type.Integer({ minimum: 1, description: 'The line where they should start writing (usually a blank line)' })
         },
-        { description: "Where in THEIR file this step is written. Their editor marks the line and shows your lines there, faded, one at a time as they type. Use it whenever you know the place." }
+        { description: "Where in THEIR file this step is written. Their editor labels that line with the step's title and offers the official line for each tagged line. Use it whenever you know the place." }
       )
-    )
+    ),
+    checks: Type.Optional(
+      Type.Array(
+        Type.Object({
+          inputs: Type.Array(Type.String({ maxLength: 60 }), { maxItems: MAX_INPUTS, description: 'What to type, one line each, in order ("abc", or "7", "3", "+"). Empty when it asks for nothing.' }),
+          expect: Type.Array(
+            Type.Object({
+              kind: Type.Union([Type.Literal('no_crash'), Type.Literal('prints_number'), Type.Literal('prints'), Type.Literal('not_prints')], {
+                description: 'no_crash: ends normally. prints_number: prints this number (value). prints: shows these words (text). not_prints: never shows these words (text), e.g. a prompt it should skip.'
+              }),
+              value: Type.Optional(Type.Number({ description: 'prints_number: the number' })),
+              text: Type.Optional(Type.String({ maxLength: 80, description: 'prints / not_prints: words their code already prints, or words this step tells them to print' }))
+            }),
+            { minItems: 1, maxItems: MAX_EXPECTS }
+          )
+        }),
+        {
+          maxItems: MAX_CHECKS,
+          description:
+            "How the learner's Check button tests this step: the app runs THEIR file once per check, types the inputs in, and grades what happens itself. Give 1-3 checks whenever a run can show the step works (the normal case and the bad case). Work numbers out carefully; pick inputs whose answer differs from every input. Only words their code already prints, or that this step tells them to print."
+        }
+      )
+    ),
+    task_id: Type.Optional(Type.String({ maxLength: 8, description: 'The task this step belongs to ("t2"), when it is one of that task\'s steps' })),
+    step_number: Type.Optional(Type.Integer({ minimum: 1, maximum: 6, description: "Which of that task's steps it is, from 1" }))
   })
   const https = (u: string | undefined) => (u && /^https:\/\/[^\s]+$/.test(u) ? u : undefined)
   const step: AgentTool<typeof StepParams> = {
@@ -252,6 +285,9 @@ export function createVisualTools(
             ...(p.idea.level ? { level: p.idea.level } : {})
           }
         : undefined
+      // An idea has no file to run, so no checks.
+      const checks = root ? cleanChecks(p.checks) : []
+      if (p.checks?.length && root && checks.length < p.checks.length) throw new Error('Each check needs at least one expect: no_crash, prints_number with value, or prints / not_prints with text.')
       // Only a real file of theirs: the same sandbox as reading. An idea has no folder, so no place.
       const anchor = root && p.at ? { path: (await ports.files.resolve(root, p.at.path, allowed)).rel, line: p.at.line } : undefined
       const card: Card = {
@@ -260,7 +296,9 @@ export function createVisualTools(
         ...(idea ? { idea } : {}),
         lines,
         ...(anchor ? { anchor } : {}),
-        ...(p.question ? { question: { question: p.question.question, options: p.question.options, allowOther: true } } : {})
+        ...(p.question ? { question: { question: p.question.question, options: p.question.options, allowOther: true } } : {}),
+        ...(checks.length ? { checks } : {}),
+        ...(p.task_id && p.step_number ? { of: { taskId: p.task_id.trim(), step: p.step_number } } : {})
       }
       check(card)
       // A card ends the reply (a round of only cards ends the turn): another round would only repeat the headline.
@@ -268,78 +306,88 @@ export function createVisualTools(
     }
   }
 
-  const AnimateParams = Type.Object({
-    file: Type.String({ description: 'Python file or Jupyter notebook (.ipynb), relative to the project root' }),
-    scenario: Type.Optional(Type.Array(
-      Type.Object({
-        call: Type.String({
-          description:
-            'A function or class name from that file, or a method on a name you assigned earlier: "TodoList", "todos.add". No code, no private names.'
-        }),
-        args: Type.Optional(Type.Array(Type.Unknown(), { description: 'Plain values only: text, numbers, true/false, lists' })),
-        assign: Type.Optional(Type.String({ description: 'Keep the result under this name for later calls, e.g. "todos"' }))
-      }),
-      {
-        maxItems: 12,
-        description: 'Calls to make. Leave it out (or empty) to run the whole file or notebook top to bottom.'
-      }
-    )),
-    title: Type.String({ maxLength: 80, description: 'What this shows, e.g. "What remove(1) really deletes"' }),
-    note: Type.String({ maxLength: 200, description: 'What to watch for, in plain words' })
-  })
-  const animate: AgentTool<typeof AnimateParams> = {
-    name: 'animate_code',
-    label: 'Animation',
-    description:
-      "Actually RUN the learner's own Python code or notebook and show an animation they can step through: the current line, the variables, lists and arrays drawn as boxes/grids. Best way to show what their code really does (bugs, loops, off-by-one, recursion). Either run the whole file/notebook top to bottom (no scenario), or describe calls as data (names in their file + plain values); BetterCoder builds and runs it, so you never write code. You get a summary of what happened.",
-    parameters: AnimateParams,
-    execute: async (_id, p) => {
-      const trace = await ports.animator.run({
-        root,
-        files,
-        file: p.file,
-        scenario: (p.scenario ?? []).map((c) => ({ call: c.call, args: c.args ?? [], ...(c.assign ? { assign: c.assign } : {}) }))
-      })
-      const card: Card = { kind: 'animation', title: p.title, note: p.note, trace }
-      check(card)
-      return {
-        content: [{ type: 'text' as const, text: `Shown to the learner as an animation.\n${summarizeTrace(trace)}` }],
-        details: card
-      }
-    }
-  }
-
-  const ExampleParams = Type.Object({
-    python: Type.String({
-      maxLength: 4000,
-      description:
-        'A short, self-contained Python script (standard library only, no input(), no network, no files) that shows the idea with plain, well-named variables. Hidden from the learner: they see only the variables and what it prints.'
+  const Item = Type.Object({
+    type: Type.Union([Type.Literal('box'), Type.Literal('cells'), Type.Literal('note'), Type.Literal('arrow')], {
+      description: 'box: a value or a few words in a shape. cells: a row of cells (a list, a queue, letters). note: words with no border. arrow: from one thing to another.'
     }),
-    title: Type.String({ maxLength: 80, description: 'What this shows, e.g. "A dict becomes text and back"' }),
-    note: Type.String({ maxLength: 200, description: 'What to watch for, in plain words' })
+    id: Type.String({ maxLength: 24, description: 'Short name to refer to it later: "total", "nums". A cell is "<row id>.<index>": "nums.2".' }),
+    text: Type.Optional(Type.String({ maxLength: BOARD_LIMITS.noteText, description: 'box or note: a value or a few plain words ("5", "\\"milk\\"", "empty")' })),
+    label: Type.Optional(Type.String({ maxLength: BOARD_LIMITS.boxText, description: 'box or cells: its name, shown above it ("total"); arrow: a word on it' })),
+    items: Type.Optional(Type.Array(Type.String({ maxLength: BOARD_LIMITS.boxText }), { maxItems: BOARD_LIMITS.cells, description: 'cells: one value per cell' })),
+    shape: Type.Optional(Type.Union([Type.Literal('box'), Type.Literal('circle'), Type.Literal('diamond')])),
+    indexes: Type.Optional(Type.Boolean({ description: 'cells: show 0, 1, 2… under them (default true)' })),
+    from: Type.Optional(Type.String({ description: 'arrow: id it starts at' })),
+    to: Type.Optional(Type.String({ description: 'arrow: id it points to' }))
   })
-  const example: AgentTool<typeof ExampleParams> = {
-    name: 'animate_example',
-    label: 'Animation',
+  const BoardStepParams = Type.Object({
+    say: Type.String({ minLength: 2, maxLength: BOARD_LIMITS.say, description: 'One short plain line: what happens now ("i moves to the next cell")' }),
+    add: Type.Optional(Type.Array(Item, { maxItems: BOARD_LIMITS.itemsPerStep })),
+    change: Type.Optional(
+      Type.Array(
+        Type.Object({
+          id: Type.String({ description: 'A box, note, arrow, a row, or one cell ("nums.2")' }),
+          text: Type.Optional(Type.String({ maxLength: BOARD_LIMITS.noteText, description: 'New value or words' })),
+          items: Type.Optional(Type.Array(Type.String({ maxLength: BOARD_LIMITS.boxText }), { maxItems: BOARD_LIMITS.cells, description: 'A row: all its cells, when it grows or shrinks' }))
+        }),
+        { maxItems: BOARD_LIMITS.itemsPerStep }
+      )
+    ),
+    remove: Type.Optional(Type.Array(Type.String(), { maxItems: BOARD_LIMITS.itemsPerStep, description: 'Ids to take off (their arrows go too)' })),
+    focus: Type.Optional(Type.Array(Type.String(), { maxItems: 6, description: 'Ids to light up in this step (what is added or changed lights up anyway)' }))
+  })
+  const BoardParams = Type.Object({
+    title: Type.String({ maxLength: 80, description: 'What this shows, e.g. "Why the loop stops one early"' }),
+    note: Type.String({ maxLength: 200, description: 'What to watch for, in plain words' }),
+    steps: Type.Array(BoardStepParams, { minItems: 1, maxItems: BOARD_LIMITS.steps })
+  })
+  const draw: AgentTool<typeof BoardParams> = {
+    name: 'draw_board',
+    label: 'Whiteboard',
     description:
-      "Show an idea in motion with the animator: you write a small Python example, BetterCoder runs it in a sandbox, and the learner steps through how the variables change (lists, dicts and objects drawn as boxes) and what it prints. They never see your code, so it does not break the no-code rule; never repeat it in text or cards. Prefer this over a diagram to show what data looks like as it changes (serializing, sorting, loops, references). Python only. Prints and text values must be data, not code.",
-    parameters: ExampleParams,
+      'Draw on a whiteboard, step by step, like a teacher: boxes for values (label = the name, text = the value), rows of cells for lists, notes, and arrows for what points to what. Each step adds, changes, removes or lights up things and says what happened in one line; the learner plays it or steps through. You say what is on the board, the app places it: boxes flow in rows in the order you add them, each row of cells gets its own line, notes go at the bottom. Add things in the order they should read. When their last run is in view, use its real inputs and values, and light up where it goes wrong. Use it to show how data changes (loops, indexes, lists, references, recursion, sorting) or how parts of their program connect. Values and plain words only, never code.',
+    parameters: BoardParams,
     execute: async (_id, p) => {
-      const ran = await ports.animator.runExample(p.python)
-      // The code stays here: the window gets the variables and output only.
-      const trace: Trace = { ...ran, file: 'example', source: [], scenario: [], example: true, steps: visibleSteps(ran.steps).map((s) => ({ ...s, file: 'example' })) }
-      const problem = exampleProblem(trace)
-      if (problem) throw new Error(problem)
-      const card: Card = { kind: 'animation', title: p.title, note: p.note, trace }
-      check(card)
-      return {
-        content: [{ type: 'text' as const, text: `Shown to the learner as an animation (your code stays hidden).\n${summarizeTrace(trace)}` }],
-        details: card
+      const board: Board = {
+        steps: p.steps.map((s, n) => ({
+          say: s.say.trim(),
+          add: (s.add ?? []).map((it) => boardItem(it, n)),
+          change: (s.change ?? []).map((c) => ({ id: c.id, ...(c.text !== undefined ? { text: c.text } : {}), ...(c.items ? { items: c.items } : {}) })),
+          remove: s.remove ?? [],
+          focus: s.focus ?? []
+        }))
       }
+      const problem = boardProblem(board)
+      if (problem) throw new Error(problem)
+      const card: Card = { kind: 'board', title: p.title, note: p.note, board }
+      check(card)
+      return { ...shown(card), terminate: true }
     }
   }
 
-  return [ask, diagram, pointTo, step, animate, example] as AgentTool<any>[]
+  return [ask, diagram, pointTo, step, draw] as AgentTool<any>[]
+}
+
+/** One item from the tool's flat shape, checked for what its type needs. */
+function boardItem(
+  it: { type: BoardItem['type']; id: string; text?: string; label?: string; items?: string[]; shape?: 'box' | 'circle' | 'diamond'; indexes?: boolean; from?: string; to?: string },
+  n: number
+): BoardItem {
+  const at = `Step ${n + 1}, "${it.id}"`
+  switch (it.type) {
+    case 'box':
+      if (!it.text) throw new Error(`${at}: a box needs text.`)
+      if (it.text.length > BOARD_LIMITS.boxText) throw new Error(`${at}: keep a box to ${BOARD_LIMITS.boxText} characters; use a note for more.`)
+      return { type: 'box', id: it.id, text: it.text, ...(it.label ? { label: it.label } : {}), ...(it.shape ? { shape: it.shape } : {}) }
+    case 'cells':
+      if (!it.items?.length) throw new Error(`${at}: a row of cells needs items.`)
+      return { type: 'cells', id: it.id, items: it.items, ...(it.label ? { label: it.label } : {}), ...(it.indexes === false ? { indexes: false } : {}) }
+    case 'note':
+      if (!it.text) throw new Error(`${at}: a note needs text.`)
+      return { type: 'note', id: it.id, text: it.text }
+    case 'arrow':
+      if (!it.from || !it.to) throw new Error(`${at}: an arrow needs from and to.`)
+      return { type: 'arrow', id: it.id, from: it.from, to: it.to, ...(it.label ? { label: it.label } : {}) }
+  }
 }
 
 export const VISUAL_TOOL_NAMES = new Set([
@@ -350,6 +398,8 @@ export const VISUAL_TOOL_NAMES = new Set([
   'show_steps',
   'show_pseudocode',
   'show_step',
+  'draw_board',
+  // From before the whiteboard: old sessions still have these cards.
   'animate_code',
   'animate_example'
 ])

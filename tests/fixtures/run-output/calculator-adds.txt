@@ -1,0 +1,4 @@
+First number: 7
+Second number: 5
+Operation: *
+12

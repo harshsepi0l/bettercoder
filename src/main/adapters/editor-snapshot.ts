@@ -89,6 +89,11 @@ export function parseIdeMessage(line: string): FromIde | null {
       const id = str(o.id, 64)
       return id ? { type: 'term_stop', id } : null
     }
+    case 'official': {
+      const url = str(o.url, 500)
+      const term = str(o.term, 100)
+      return url && term && /^https:\/\//.test(url) ? { type: 'official', url, term } : null
+    }
     default:
       return null
   }
@@ -96,7 +101,7 @@ export function parseIdeMessage(line: string): FromIde | null {
 
 /** Is this message a run or terminal command (not part of the editor's snapshot)? */
 export function isIdeCommand(m: FromIde): m is IdeCommand {
-  return m.type === 'run' || m.type === 'term_input' || m.type === 'term_resize' || m.type === 'term_stop'
+  return m.type === 'run' || m.type === 'term_input' || m.type === 'term_resize' || m.type === 'term_stop' || m.type === 'official'
 }
 
 /** The same errors (by code and message, not line: lines move as they type) count as one unchanged problem. */

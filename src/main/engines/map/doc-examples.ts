@@ -213,6 +213,20 @@ function leadingBlank(lines: string[]): number {
   return n
 }
 
+/**
+ * The example as the editor shows it under the step (word for word): the whole example when there is one, with the
+ * line that uses the method lit; otherwise the few lines around it. No example: no lines, focus -1.
+ */
+export function editorExample(example: DocExample | null): { lines: string[]; focus: number } {
+  if (!example || example.excerpt.length === 0) return { lines: [], focus: -1 }
+  const focusLine = example.focus !== undefined ? example.excerpt[example.focus] : undefined
+  if (example.full && focusLine !== undefined) {
+    const at = example.full.findIndex((l) => l.trim() === focusLine.trim())
+    if (at >= 0) return { lines: example.full.slice(0, FULL_LINES), focus: at < FULL_LINES ? at : -1 }
+  }
+  return { lines: example.excerpt, focus: example.focus ?? -1 }
+}
+
 /** Fetch (or reuse) the example for a doc link. Null for unofficial sites, failures, or pages with no example. */
 export function createDocExamples(cacheDir: string, fetcher: typeof fetch = fetch) {
   const memory = new Map<string, Promise<DocExample | null>>()

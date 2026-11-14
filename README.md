@@ -19,8 +19,8 @@
 - **One window to work in.** Real VS Code in the Code tab (open source, extensions from Open VSX), with your own VS Code or Cursor setup brought over, and the coach beside your code.
 - **Coaches one step at a time.** Each step is one card: the idea, the pseudocode, and the real line from the official docs.
 - **Never writes your code.** Every reply and card is checked before you see it; real code is sent back to be redone.
-- **Runs your code and shows it.** ▶ Run works for Python, notebooks, JavaScript/TypeScript, C#, Java, Kotlin, Swift, C and C++: the real output, the failing line underlined, and one line in plain words. The animator runs your Python on a sandboxed copy so you can step through it: the line, the variables, lists and objects drawn as boxes.
-- **Shows ideas in motion.** For "how does serializing work?", the coach runs a small hidden example and you watch the values change.
+- **Runs your code and shows it.** ▶ Run works for Python, notebooks, JavaScript/TypeScript, C#, Java, Kotlin, Swift, C and C++: the real output, the failing line underlined, and one line in plain words.
+- **Draws ideas on a whiteboard.** For "why does my loop stop early?", the coach draws it step by step and you watch the values change.
 - **Maps your project.** Files, classes and functions for Python, TypeScript/JavaScript, Java, C#, Kotlin, Swift and C++.
 
 ## Who it's for
@@ -49,15 +49,9 @@ You choose how real code shows, with a preview: everything with one line lit, or
 
 <p align="center"><img src="docs/images/settings.png" width="620" alt="Settings: Highlight or One at a time, each with a preview"></p>
 
-### Watch code run
+### The whiteboard
 
-Your own Python, run on a copy in a sandbox. Here `remove(1)` deletes the wrong to-do, and you can see why.
-
-<p align="center"><img src="docs/images/animate-own.png" alt="The animator on a to-do app: the code with the current line lit, and the list of to-dos drawn as boxes"></p>
-
-Ideas get a hidden example: you see the values and a numbered story, never the coach's code.
-
-<p align="center"><img src="docs/images/example.gif" width="720" alt="A dict becoming JSON text and back, step by step, with a numbered story growing below"></p>
+The coach draws on a whiteboard, step by step, like a teacher: your values as named boxes, lists as rows of cells, arrows for what points to what, and one line saying what happens at each step. Play it or step through it in the chat, or full size in Visualize. It works in any language, and before you have code.
 
 ### Your project at a glance
 
@@ -74,7 +68,7 @@ Ideas get a hidden example: you see the values and a numbered story, never the c
 
 ### Write it here
 
-The Code tab is VS Code: formatting, linting, notebooks and debugging. AI extensions are never installed, and autocomplete offers names only. The coach marks the line to write next and shows the step's pseudocode faded there, one line at a time; it is never part of your file. Drag the coach's edge to make it wider or narrower.
+The Code tab is VS Code: formatting, linting, notebooks and debugging. AI extensions are never installed, and autocomplete offers names only. Above the line to write next, a label names the step; "See the official line" opens the method's official example right under it, from the docs, never from the coach. Nothing is ever put into your file. Drag the coach's edge to make it wider or narrower.
 
 ### Run any language
 
@@ -96,7 +90,7 @@ Make the window narrow and the coach becomes a tab. Projects become blocks; tap 
 
 ## Get started
 
-You need macOS (the animator uses the macOS sandbox), Node 24, and Python 3 for animations. ▶ Run uses whatever you have installed for each language.
+You need macOS, Node 24, and Python 3 for the Map's Python analyzer. ▶ Run uses whatever you have installed for each language.
 
 ```bash
 npm install
@@ -109,7 +103,7 @@ Then connect a model in **Settings**. BetterCoder works with 42 providers throug
 ## The rules it keeps
 
 - **No code for you, ever.** One mode, no switch. Pseudocode in step cards is checked to be language-neutral.
-- **You write, the coach never does.** Only you write, in the Code tab's VS Code; the app itself writes nothing into your project. The coach only reads: no path escapes, secret files are refused, secrets are blanked out. Its runs (the animator, examples) happen on a sandboxed copy.
+- **You write, the coach never does.** Only you write, in the Code tab's VS Code; the app itself writes nothing into your project. The coach only reads: no path escapes, secret files are refused, secrets are blanked out. It never runs code itself.
 - **What you type is never word-matched.** Buttons send structured intents; your words go to the model as they are.
 - **Sessions never break.** State is rebuilt from the saved conversation, so a restart picks up where you were.
 

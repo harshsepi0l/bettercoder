@@ -14,6 +14,8 @@ interface Term {
   kind: 'run'
   root: string
   run?: RunSummary
+  /** A step's Check: not the learner's own run, so it never becomes their last run. */
+  check?: boolean
 }
 
 const ANSI = /\x1b\[[0-9;?]*[ -/]*[@-~]|\x1b\][^\x07\x1b]*(\x07|\x1b\\)|\x1b[@-Z\\-_]/g
@@ -67,16 +69,21 @@ export class TerminalHub {
     return () => this.listeners.delete(listener)
   }
 
+  /** Was this run a step's Check (not the learner's own run)? */
+  isCheck(id: string): boolean {
+    return !!this.terms.get(id)?.check
+  }
+
   /** A run ended: its summary, and the problems to underline (null when it ended without an error in their code). */
   onRunEnd(listener: (sessionId: string, run: RunSummary, problems: { path: string; items: IdeDiagnostic[] } | null) => void): () => void {
     this.runEndListeners.add(listener)
     return () => this.runEndListeners.delete(listener)
   }
 
-  startRun(sessionId: string, root: string, path: string, spawn: TerminalSpawn): RunSummary {
+  startRun(sessionId: string, root: string, path: string, spawn: TerminalSpawn, opts: { check?: boolean } = {}): RunSummary {
     const id = this.terminals.spawn(spawn)
     const run: RunSummary = { id, path, startedAt: this.now(), endedAt: null, exitCode: null, stopped: false, output: '', error: null, words: null }
-    this.terms.set(id, { id, sessionId, kind: 'run', root, run })
+    this.terms.set(id, { id, sessionId, kind: 'run', root, run, ...(opts.check ? { check: true } : {}) })
     this.rawOutput.set(id, '')
     this.emit({ type: 'run', run })
     return run
@@ -107,6 +114,9 @@ export class TerminalHub {
   /** Close a tab: stop it if it still runs, and forget it. */
   close(sessionId: string, id: string): void {
     this.stop(sessionId, id)
+    // Its process exits after it is forgotten, so end the run now: whoever waits for it (a step's Check) is told.
+    const t = this.terms.get(id)
+    if (t?.run && t.run.endedAt === null) this.finishRun(t, null)
     this.terms.delete(id)
     this.rawOutput.delete(id)
   }
@@ -152,7 +162,7 @@ export class TerminalHub {
         }
       }
     }
-    this.last.set(t.sessionId, run)
+    if (!t.check) this.last.set(t.sessionId, run)
     this.emit({ type: 'run', run })
     for (const l of this.runEndListeners) l(t.sessionId, run, problems)
   }

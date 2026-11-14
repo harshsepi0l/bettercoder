@@ -1,5 +1,5 @@
 import { join, relative, isAbsolute } from 'node:path'
-import { NO_IDE, type IdeView, type Mood, type TaskProgress } from '../../shared/ide'
+import { NO_IDE, type IdeView, type Mood } from '../../shared/ide'
 import type { AnchoredStep } from '../coach/replay'
 import type { EditorFeed, EditorSnapshot } from '../ports'
 import { editorContext, visiblePath } from './editor-context'
@@ -13,12 +13,13 @@ const TICK = 15_000
 
 /**
  * Ties the editor link to the open session: which project the coach sees, the step marked in the editor, the
- * progress meter and the feeling meter. Sends the panel an IdeView and the editor a short status line.
+ * current task and the feeling meter. Sends the panel an IdeView and the editor a short status line.
  */
 export class IdeHub {
   private project: { root: string; files?: string[] } | null = null
   private step: AnchoredStep | null = null
-  private tasks: TaskProgress[] = []
+  /** The current task, for the editor's status line ("Multiply too · 1 of 4 done"). */
+  private taskLine = ''
   private timer: ReturnType<typeof setInterval> | null = null
   private lastView = ''
   /** The learner's last ▶ Run in this session (memory only, never stored). */
@@ -40,23 +41,38 @@ export class IdeHub {
     this.timer = null
   }
 
-  /** A session opened (or closed, with null): its project, stored progress and last marked step. */
-  setSession(project: { root: string; files?: string[] } | null, tasks: TaskProgress[] = [], step: AnchoredStep | null = null): void {
+  /** A session opened (or closed, with null): its project, current task and last marked step. */
+  setSession(project: { root: string; files?: string[] } | null, taskLine = '', step: AnchoredStep | null = null): void {
     this.project = project?.root ? project : null
-    this.tasks = tasks
+    this.taskLine = taskLine
     this.lastRun = null
     this.setStep(step)
   }
 
-  setProgress(tasks: TaskProgress[]): void {
-    this.tasks = tasks
+  setTaskLine(line: string): void {
+    if (line === this.taskLine) return
+    this.taskLine = line
+    this.lastView = ''
     this.changed()
+  }
+
+  /** The file open in the editor, relative to the project (only one of theirs), or null. */
+  editorFile(): string | null {
+    if (!this.project) return null
+    const snap = this.bridge.snapshot()
+    return snap ? visiblePath(this.project.root, this.project.files, snap.file) : null
+  }
+
+  /** The learner's last ▶ Run in this session, for Check my answer. */
+  lastRunNow(): RunSummary | null {
+    return this.lastRun
   }
 
   setStep(step: AnchoredStep | null): void {
     this.step = step && this.project ? step : null
     if (this.step && this.project) {
-      this.bridge.send({ type: 'anchor', stepId: this.step.id, file: join(this.project.root, this.step.path), line: this.step.line, ghost: this.step.ghost })
+      const { id, title, ghost, official } = this.step
+      this.bridge.send({ type: 'anchor', stepId: id, file: join(this.project.root, this.step.path), line: this.step.line, title, ghost, official })
     } else {
       this.bridge.send({ type: 'clear' })
     }
@@ -98,7 +114,7 @@ export class IdeHub {
 
   view(): IdeView {
     const snap = this.bridge.snapshot()
-    if (!snap) return { ...NO_IDE, tasks: this.tasks }
+    if (!snap) return NO_IDE
     const rel = this.project ? visiblePath(this.project.root, this.project.files, snap.file) : null
     const f = this.feelingOf(snap)
     return {
@@ -109,13 +125,12 @@ export class IdeHub {
       line: rel ? snap.line : null,
       mood: rel ? f.mood : null,
       why: rel ? f.why : '',
-      tasks: this.tasks,
       stepDone: !!this.step && snap.stepsDone.has(this.step.id),
       typed: this.step && snap.stepTyped?.stepId === this.step.id ? snap.stepTyped.n : 0
     }
   }
 
-  /** Something changed (editor, step, progress, time): update the panel and the editor's status line. */
+  /** Something changed (editor, step, task, time): update the panel and the editor's status line. */
   changed(): void {
     const view = this.view()
     const key = JSON.stringify(view)
@@ -123,8 +138,7 @@ export class IdeHub {
     this.lastView = key
     this.emit(view)
     if (view.linked) {
-      const current = view.tasks.find((t) => t.percent < 100) ?? view.tasks.at(-1)
-      const parts = [current ? `${current.title} ${current.percent}%` : 'BetterCoder', view.mood ? MOOD_WORD[view.mood] : '']
+      const parts = [this.taskLine || 'BetterCoder', view.mood ? MOOD_WORD[view.mood] : '']
       this.bridge.send({ type: 'status', text: parts.filter(Boolean).join(' · '), tooltip: view.why || 'BetterCoder is watching' })
     }
   }

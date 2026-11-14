@@ -119,19 +119,20 @@ test('a write-style tool call is blocked', async () => {
   assert.ok(!seen.join(' ').includes('wrote'), 'no write should happen')
 })
 
-test('old tool results are trimmed before each request, so context stays small', async () => {
-  const { prepareMessages } = await import('../src/main/coach/request')
-  const compactOldToolResults = (m: never[]) => prepareMessages(m)
+test('old tool results are trimmed every 4 learner messages, all at once, so context stays small and the cache holds', async () => {
+  const { prepareMessages, TIDY_EVERY } = await import('../src/main/coach/request')
   const big = 'x'.repeat(5000)
-  const msgs = [
-    { role: 'user', content: 'first', timestamp: 1 },
-    { role: 'toolResult', toolCallId: 'a', toolName: 'read_file', content: [{ type: 'text', text: big }], isError: false, timestamp: 2 },
-    { role: 'user', content: 'second', timestamp: 3 },
-    { role: 'toolResult', toolCallId: 'b', toolName: 'read_file', content: [{ type: 'text', text: big }], isError: false, timestamp: 4 }
-  ] as never[]
-  const out = compactOldToolResults(msgs) as Array<{ role: string; content: unknown }>
-  assert.match(JSON.stringify(out[1].content), /removed to save space/)
-  assert.ok(JSON.stringify(out[3].content).includes(big), 'the current turn keeps its results')
+  const turn = (n: number) => [
+    { role: 'user', content: `message ${n}`, timestamp: n * 10 },
+    { role: 'toolResult', toolCallId: `c${n}`, toolName: 'read_file', content: [{ type: 'text', text: big }], isError: false, timestamp: n * 10 + 1 }
+  ]
+  const upTo = (n: number) => Array.from({ length: n }, (_, k) => turn(k + 1)).flat() as never[]
+  const stubbed = (out: Array<{ role: string; content: unknown }>) => out.filter((m) => m.role === 'toolResult' && /removed to save space/.test(JSON.stringify(m.content))).length
+  // Messages 1-4: nothing trimmed yet, so each request only adds to the one before.
+  for (let n = 1; n <= TIDY_EVERY; n++) assert.equal(stubbed(prepareMessages(upTo(n)) as never), 0, `message ${n}`)
+  // Message 5: the first four turns' results are trimmed together, and stay trimmed through message 8.
+  for (let n = TIDY_EVERY + 1; n <= 2 * TIDY_EVERY; n++) assert.equal(stubbed(prepareMessages(upTo(n)) as never), TIDY_EVERY, `message ${n}`)
+  assert.equal(stubbed(prepareMessages(upTo(2 * TIDY_EVERY + 1)) as never), 2 * TIDY_EVERY)
 })
 
 // A hidden redo (Visualize nudge, no-code rewrite) is part of the same turn: its results must not be stubbed.

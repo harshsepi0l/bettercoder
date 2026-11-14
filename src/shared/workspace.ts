@@ -15,6 +15,7 @@ export const WORKSPACE_IPC = {
   openSession: 'workspace:open-session',
   renameSession: 'workspace:rename-session',
   deleteSession: 'workspace:delete-session',
+  clearChat: 'workspace:clear-chat',
   deleteProject: 'workspace:delete-project',
   startIdea: 'workspace:start-idea',
   linkFolder: 'workspace:link-folder',
@@ -61,6 +62,8 @@ export interface WorkspaceApi {
   openSession(sessionId: string): Promise<OpenSession>
   renameSession(sessionId: string, title: string): Promise<void>
   deleteSession(sessionId: string): Promise<void>
+  /** Clear chat: the session's conversation starts fresh (the coach forgets it); its title and tasks stay. */
+  clearChat(sessionId: string): Promise<OpenSession>
   /** Forget a project and delete all its sessions (your files are never touched). */
   deleteProject(projectId: string): Promise<void>
   /** Fires when projects or sessions are added, renamed or updated. */

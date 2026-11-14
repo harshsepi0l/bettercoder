@@ -33,7 +33,7 @@ export class IdeBridge implements EditorFeed {
   /** "Open in editor" asked for before the editor connected (the Code tab was only now opening it). */
   private pendingOpen: { message: ToIde; at: number } | null = null
   /** Who handles ▶ Run and terminal keystrokes from the editor (the Code area), once it is ready. */
-  private commands: ((m: IdeCommand) => void) | null = null
+  private commands: Array<(m: IdeCommand) => void> = []
 
   constructor(
     private readonly onChange: () => void,
@@ -77,8 +77,9 @@ export class IdeBridge implements EditorFeed {
   }
 
   /** ▶ Run and terminal keystrokes from the editor go to this handler. */
+  /** Requests from the editor (▶ Run and its terminal, the official line); each handler takes the ones it knows. */
   onCommand(handler: (m: IdeCommand) => void): void {
-    this.commands = handler
+    this.commands.push(handler)
   }
 
   /** Send to every connected editor (each shows the marker only on its own copy of the file). */
@@ -131,7 +132,7 @@ export class IdeBridge implements EditorFeed {
   private apply(conn: Connection, m: FromIde): void {
     if (isIdeCommand(m)) {
       conn.lastAt = this.now()
-      this.commands?.(m)
+      for (const handler of this.commands) handler(m)
       return
     }
     // A window says hello, or reports its editor when it gains focus: that window is the one to follow.

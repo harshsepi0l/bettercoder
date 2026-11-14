@@ -139,23 +139,19 @@ test('a diagram with a click handler is refused', async () => {
   assert.equal(cards(events).length, 0)
 })
 
-test('the Visualize button ends in an animation, even if the model first answers in words', { skip: !(await import('../src/main/engines/visualize/runner')).findPython }, async () => {
+test('the Visualize button ends in a whiteboard, even if the model first answers in words', async () => {
   const { faux, session, events } = await setup()
-  const offered: string[][] = []
   faux.setResponses([
-    (context) => {
-      offered.push((context as { tools?: Array<{ name: string }> }).tools?.map((t) => t.name) ?? [])
-      return fauxAssistantMessage('**remove() deletes by position**\n- It uses the number directly')
-    },
+    fauxAssistantMessage('**remove() deletes by position**\n- It uses the number directly'),
     fauxAssistantMessage(
       [
-        fauxToolCall('animate_code', {
-          file: 'todos.py',
+        fauxToolCall('draw_board', {
           title: 'What remove(1) deletes',
-          note: 'Watch items when number is 1',
-          scenario: [
-            { call: 'TodoList', args: [], assign: 'todos' },
-            { call: 'todos.remove', args: [1] }
+          note: 'Watch which cell goes',
+          steps: [
+            { say: 'Your list has three things', add: [{ type: 'cells', id: 'items', label: 'items', items: ['"milk"', '"eggs"', '"tea"'], col: 0, row: 0 }] },
+            { say: 'number is 1, so position 1 goes', add: [{ type: 'box', id: 'number', label: 'number', text: '1', col: 0, row: 2 }, { type: 'arrow', id: 'at', from: 'number', to: 'items.1' }] },
+            { say: 'eggs is gone, not milk', change: [{ id: 'items', items: ['"milk"', '"tea"'] }], remove: ['at'] }
           ]
         })
       ],
@@ -163,11 +159,21 @@ test('the Visualize button ends in an animation, even if the model first answers
     ),
     fauxAssistantMessage('**Step to the end**')
   ])
-  await session.send('Visualize my code running.', 'visualize')
+  await session.send('Draw what my code does on the whiteboard.', 'visualize')
   await session.waitForIdle()
-  const anim = cards(events).find((c) => c.kind === 'animation')
-  assert.ok(anim, 'an animation card should be shown')
-  assert.equal(faux.state.callCount, 3)
+  const board = cards(events).find((c) => c.kind === 'board')
+  assert.ok(board && board.kind === 'board', 'a whiteboard card should be shown')
+  assert.equal(board.board.steps.length, 3)
+  // The words came first, so the coach was nudged once to draw: words, board, and the card ends the turn.
+  assert.equal(faux.state.callCount, 2)
+})
+
+test('the whiteboard refuses code in its words, and anything that points at nothing; data values are fine', () => {
+  const board = (say: string, text: string) => ({ kind: 'board' as const, title: 't', note: 'n', board: { steps: [{ say, add: [{ type: 'box' as const, id: 'a', text, col: 0, row: 0 }], change: [], remove: [], focus: [] }] } })
+  assert.equal(cardProblem(board('a list of numbers', '[1, 2, 3]')), null)
+  assert.equal(cardProblem(board('a dict', "{'a': 1}")), null)
+  assert.match(cardProblem(board('the loop', 'for i in range(10):')) ?? '', /code/)
+  assert.match(cardProblem(board('total = total + n', '5')) ?? '', /code/)
 })
 
 // Regression: a real Grok session sent point_to_code without a note; the call failed and cost a whole round.
@@ -200,27 +206,23 @@ test('chat: everything the coach says between two learner messages is one coach 
   )
 })
 
-test('visualize tab: lists every animation the coach showed in the session, oldest first', async () => {
-  const { animationsFromChat } = await import('../src/shared/chat')
-  const trace = { language: 'python' as const, file: 'example', source: [], scenario: [], steps: [], example: true as const }
-  const anim = (title: string) => ({ kind: 'animation' as const, title, note: 'n', trace })
+test('visualize tab: lists every whiteboard the coach drew in the session, oldest first; old animations are left out', async () => {
+  const { boardsFromChat } = await import('../src/shared/chat')
+  const board = (title: string) => ({ kind: 'board' as const, title, note: 'n', board: { steps: [{ say: 's', add: [], change: [], remove: [], focus: [] }] } })
   const items = [
     { kind: 'user' as const, id: 'u', text: 'how?' },
-    { kind: 'card' as const, id: 'a', card: anim('first') },
-    { kind: 'card' as const, id: 'q', card: { kind: 'question' as const, question: 'q?', options: ['a', 'b'], allowOther: true } },
-    { kind: 'card' as const, id: 'b', card: anim('second') }
+    { kind: 'card' as const, id: 'a', card: board('first') },
+    { kind: 'card' as const, id: 'old', card: { kind: 'animation' as const, title: 'from the old animator', note: 'n' } },
+    { kind: 'card' as const, id: 'b', card: board('second') }
   ]
-  assert.deepEqual(animationsFromChat(items).map((a) => [a.id, a.card.title]), [
+  assert.deepEqual(boardsFromChat(items).map((a) => [a.id, a.card.title]), [
     ['a', 'first'],
     ['b', 'second']
   ])
 })
 
-test('tabs: an idea session unlocks Visualize once it has an animation (regression: it stayed greyed out)', async () => {
+test('tabs: an idea has no Map or Tasks; Visualize (the whiteboard) is always open', async () => {
   const { lockedSections } = await import('../src/shared/chat')
-  const trace = { language: 'python' as const, file: 'example', source: [], scenario: [], steps: [], example: true as const }
-  const withAnim = [{ kind: 'card' as const, id: 'a', card: { kind: 'animation' as const, title: 't', note: 'n', trace } }]
-  assert.deepEqual(lockedSections(true, []), ['visualize', 'map'])
-  assert.deepEqual(lockedSections(true, withAnim), ['map'])
-  assert.deepEqual(lockedSections(false, []), [])
+  assert.deepEqual(lockedSections(true), ['map', 'tasks'])
+  assert.deepEqual(lockedSections(false), [])
 })

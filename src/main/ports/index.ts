@@ -1,9 +1,9 @@
 import type { ChatItem } from '../../shared/chat'
 import type { ProjectInfo } from '../../shared/ipc'
 import type { CodeMap } from '../../shared/map'
-import type { ScenarioCall, Trace } from '../../shared/trace'
 import type { IdeDiagnostic, ToIde } from '../../shared/ide'
 import type { ProjectSummary, SessionSummary } from '../../shared/workspace'
+import type { TaskBy, TaskCheck, TaskStatus, TaskStep } from '../../shared/tasks'
 
 /**
  * Ports: what the coach and the services need from the outside world, as interfaces only. Adapters and engines
@@ -29,24 +29,6 @@ export interface ProjectFiles {
   read(abs: string): Promise<Uint8Array>
 }
 
-
-// ── Animator ───────────────────────────────────────────────────────
-
-export interface RunRequest {
-  root: string
-  /** Set for sessions opened on individual files. */
-  files?: string[]
-  /** The Python file to load, relative to root. */
-  file: string
-  scenario: ScenarioCall[]
-}
-
-export interface Animator {
-  /** Run the learner's own file (on a sandboxed temp copy) and record every step. */
-  run(req: RunRequest): Promise<Trace>
-  /** Run a small Python example the coach wrote, in a temp folder; its code is never returned. */
-  runExample(python: string): Promise<Trace>
-}
 
 // ── Code map and project scan ──────────────────────────────────────
 
@@ -79,6 +61,20 @@ export interface SessionRecord extends SessionSummary {
   items?: ChatItem[]
 }
 
+/** One task as a session keeps it (see shared/tasks.ts); `answer` is the coach's, sealed until theirs matches. */
+export interface StoredTask {
+  id: string
+  title: string
+  by: TaskBy
+  doneWhen: string
+  answer: string
+  status: TaskStatus
+  check: TaskCheck | null
+  createdAt: number
+  /** The plan, step by step (tasks from before steps have none). */
+  steps?: TaskStep[]
+}
+
 export interface SessionStore {
   upsertProject(root: string, name: string, files?: string[]): Promise<ProjectRecord>
   createIdeaProject(name: string, idea: string): Promise<ProjectRecord>
@@ -89,6 +85,11 @@ export interface SessionStore {
   getSession(sessionId: string): Promise<SessionRecord | null>
   /** The session's conversation database file (pi-durable SQLite). */
   sessionDbFile(record: Pick<SessionRecord, 'id' | 'projectId'>): string
+  /** The session's tasks; null when they were never saved (a session from before Tasks). */
+  loadTasks(record: Pick<SessionRecord, 'id' | 'projectId'>): Promise<StoredTask[] | null>
+  saveTasks(record: Pick<SessionRecord, 'id' | 'projectId'>, tasks: readonly StoredTask[]): Promise<void>
+  /** Forget a session's conversation; the session, its title and its tasks stay. */
+  clearConversation(record: Pick<SessionRecord, 'id' | 'projectId'>): Promise<void>
   deleteSession(sessionId: string): Promise<void>
   deleteProject(projectId: string): Promise<void>
   list(): Promise<ProjectSummary[]>
@@ -149,6 +150,5 @@ export interface Terminals {
 /** Everything the coach needs from outside, in one bundle. */
 export interface CoachPorts {
   files: ProjectFiles
-  animator: Animator
   mapper: CodeMapper
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { applyEvent, type ChatItem } from '../../../../shared/chat'
-import type { CoachIntent, HarnessEvent, TurnUsage } from '../../../../shared/harness'
+import type { CoachIntent, CoachMode, HarnessEvent, TurnUsage } from '../../../../shared/harness'
 
 export type { ChatItem }
 
@@ -29,10 +29,10 @@ export function useCoach() {
     })
   }, [])
 
-  /** Typed text and card answers go without an intent; buttons pass theirs. */
-  const send = useCallback((text: string, intent?: CoachIntent) => {
+  /** Typed text and card answers go without an intent; buttons pass theirs. The pane's mode goes with every message. */
+  const send = useCallback((text: string, intent?: CoachIntent, mode?: CoachMode) => {
     const trimmed = text.trim()
-    if (trimmed) void window.harness.send(trimmed, intent)
+    if (trimmed) void window.harness.send(trimmed, intent, mode)
   }, [])
 
   const stop = useCallback(() => void window.harness.abort(), [])
