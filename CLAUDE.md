@@ -23,7 +23,7 @@ A desktop app (Electron) that people write their code in (real VS Code in the Co
   - **Never checklists**, in cards or text. Old `steps` cards from past sessions render as plain numbered lines.
   - Step lines tagged with a method link to the official line. The learner picks how it shows (`codeView`): `highlight` (the line lit in its official example) or `stepper` (one line at a time). They pick it with visual previews in onboarding (its own step) and Settings › You, **never inside a session**. It defaults to highlight. The same choice sets how a whiteboard's story shows: every step so far (highlight) or only the current one (stepper). Summaries to the user should be terse too.
 - After every change, tell them **what changed in the code**, as a table: File | What changed (functions or components added, changed or removed; one row each). Keep it short, but never skip it.
-- They watch token use. Keep context small: old tool results are stubbed, reads are capped (8 per message).
+- They watch token use. Keep context small: every 4 learner messages old tool results are stubbed and old notes dropped, all at once (`TIDY_EVERY` in `coach/request.ts`); reads are capped (8 per message).
 - After fixing a bug, add a regression test in `tests/` with a fixture.
 
 ## Commands
@@ -129,7 +129,7 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
     - card use (`cardUse`, in memory per session, given to the coach as words).
   - Settings › You shows it as "Coach thinks", where the learner can correct or forget a topic (`by: 'you'`). Code evidence never overrides a correction.
   - `setProfile` never touches skills.
-- **Prompt cache:** pi-ai folds every section into the top system message, so anything that changes mid-session must go on the newest message (like the editor view), never in a section. `tests/cache.test.ts` checks the real xAI body stays byte-for-byte; routing uses pi-durable's session id only (pi-ai sends it as `prompt_cache_key`; never add a second id like `x-grok-conv-id`), and every request asks for the long cache (`cacheSettings` in `coach/request.ts`).
+- **Prompt cache:** xAI reuses a request only up to its first changed byte, so between tidy-ups every request must only grow. pi-ai folds every section into the top system message, so anything that changes mid-session goes on the newest message (like the editor view), never in a section; that note is then resent with its message unchanged (`SentNotes`, memory only). Never change the tool list mid-session (Visualize blocks other tools in `beforeTool` instead). About 1 request in 3 still misses on xAI's side (tested 2026-11-13, with or without `x-grok-conv-id`); `npm run check:session` measures it. `tests/cache.test.ts` checks the real xAI body stays byte-for-byte; routing uses pi-durable's session id only (pi-ai sends it as `prompt_cache_key`; never add a second id like `x-grok-conv-id`), and every request asks for the long cache (`cacheSettings` in `coach/request.ts`).
 
 ## pi-durable notes
 

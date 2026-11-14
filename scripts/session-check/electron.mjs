@@ -11,7 +11,7 @@ app.whenReady().then(async () => {
   register()
   let code = 1
   try {
-    const { main } = await import('./check.ts')
+    const { main } = await import(process.env.BC_CHECK ?? './check.ts')
     code = await main(process.argv.slice(2))
   } catch (e) {
     console.error(e)

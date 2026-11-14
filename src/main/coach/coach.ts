@@ -31,7 +31,7 @@ import { createTaskTool, type SetTask } from './tools/tasks'
 import type { Skill } from '../../shared/profile'
 import { MAX_REWRITES, MAX_TOOL_CALLS_PER_MESSAGE, MAX_TOOL_RESULT_CHARS, HIDDEN_PREFIX, READ_TOOLS, withIntent, stripIntent, type TurnState, turnState, textOf, MAX_TOOL_RETRIES, typedToolName, withoutToolNames, hasCode, asksQuestion } from './turn'
 import { describeTool, isToolLine, itemsFromEntries, sumUsage, type AnchoredStep, anchoredStep, lastStepFromEntries, legacyTaskTitles } from './replay'
-import { prepareMessages, cacheSettings } from './request'
+import { prepareMessages, cacheSettings, type SentNotes } from './request'
 
 /**
  * The coach, running on pi-durable. One SQLite file per session: the transcript,
@@ -93,6 +93,9 @@ export function projectLanguages(project: ProjectInfo): string[] {
   return names.length > 0 ? names : project.stacks.filter((s) => !/\//.test(s))
 }
 
+/** What a Visualize turn may call (beforeTool blocks the rest). */
+const VISUALIZE_TOOLS = new Set([...READ_TOOLS, 'ask_question', 'draw_board'])
+
 /** Cards that need no files: all a coach has before a project folder is linked. */
 const IDEA_TOOLS = new Set(['ask_question', 'show_diagram', 'show_step', 'draw_board'])
 
@@ -107,7 +110,6 @@ export class Coach {
   private shownSinceInput = false
   /** The last reply text shown since the learner's message, so a repeated headline is not shown twice. */
   private lastShown = ''
-  private toolsRestricted = false
   private busy = false
 
   private constructor(
@@ -151,6 +153,8 @@ export class Coach {
     const toolNames = new Set(agentTools.map((t) => t.name))
     // Hooks need the instance, which exists only after Harness.open; they read it through this box.
     const box: { coach?: Coach } = {}
+    // The note each learner message went out with, resent unchanged so the cache holds (memory only, never stored).
+    const sentNotes: SentNotes = new Map()
 
     const extension = defineExtension({
       name: 'bettercoder',
@@ -167,8 +171,12 @@ export class Coach {
               box.coach.roundReads = 0
             }
             // Everything that changes turn to turn rides on the newest message, so the start of the request stays cached.
-            const now = [learnerNow(deps.profile?.() ?? DEFAULT_PROFILE, languages, deps.cardUse?.() ?? ''), idea ? '' : (deps.editorContext?.() ?? ''), idea ? '' : (deps.tasksContext?.() ?? '')]
-            return { messages: prepareMessages(request.messages, idea, now.filter(Boolean).join('\n\n')) }
+            // Written once per learner message, then resent unchanged (see prepareMessages).
+            const now = () =>
+              [learnerNow(deps.profile?.() ?? DEFAULT_PROFILE, languages, deps.cardUse?.() ?? ''), idea ? '' : (deps.editorContext?.() ?? ''), idea ? '' : (deps.tasksContext?.() ?? '')]
+                .filter(Boolean)
+                .join('\n\n')
+            return { messages: prepareMessages(request.messages, idea, now, sentNotes) }
           },
           afterResponse: (message: AssistantMessage) => {
             if (box.coach) box.coach.roundAsks = asksQuestion(message)
@@ -191,6 +199,11 @@ export class Coach {
           beforeTool: (call) => {
             const c = box.coach
             if (!toolNames.has(call.name)) return { block: 'BetterCoder only allows read-only tools.' }
+            // Visualize allows only reading, asking and the whiteboard. Checked here, not by changing the tool list:
+            // a different tool list changes the start of the request, so the whole cache would be lost.
+            if (c?.state.intent === 'visualize' && !VISUALIZE_TOOLS.has(call.name)) {
+              return { block: 'The learner pressed Visualize: draw it with draw_board (read first if you need to, or ask_question which part).' }
+            }
             // Only reading counts against the budget: a card (like a question) must always get through.
             // A blocked call skips afterTool, so it could not end a question's round: let reads in that round through.
             if (c && !c.roundAsks && READ_TOOLS.has(call.name) && c.state.readCalls + ++c.roundReads > MAX_TOOL_CALLS_PER_MESSAGE) {
@@ -291,15 +304,6 @@ export class Coach {
     const current = agent.model as { provider?: string; modelId?: string } | undefined
     if (current?.provider !== model.provider || current?.modelId !== model.id) {
       await this.root.configure({ model: { provider: model.provider, modelId: model.id }, thinkingLevel: 'off' } as never, ctx)
-    }
-    if (!this.busy) {
-      // Visualize offers only reading, asking and the whiteboard (pi-durable's modelTools); everything else gets all tools.
-      const allowed = new Set([...READ_TOOLS, 'project_outline', 'ask_question', 'draw_board'])
-      const restrict = intent === 'visualize'
-      if (restrict || this.toolsRestricted) {
-        await this.root.configure({ modelTools: restrict ? this.durableTools.filter((t) => allowed.has(t.name)) : null } as never, ctx)
-        this.toolsRestricted = restrict
-      }
     }
     this.shownSinceInput = false
     this.lastShown = ''

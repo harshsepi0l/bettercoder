@@ -122,10 +122,10 @@ test('cache: the xAI request keeps its start byte-for-byte as skills, card use a
 })
 
 /**
- * The learner's last ▶ Run reaches the coach the same way as the editor view: on the newest message only. A new run
- * between messages must not change anything before the previous learner message, and no run view is ever stored.
+ * The learner's last ▶ Run reaches the coach the same way as the editor view: on the message it was sent with. A new run
+ * between messages goes on the new message only, earlier ones are resent unchanged, and no run view is ever stored.
  */
-test('cache: a new run changes only the newest message, and no run view is stored', async () => {
+test('cache: a new run rides on the new message only, earlier ones are resent unchanged, and no run view is stored', async () => {
   const faux = fauxProvider()
   const models = createModels()
   models.setProvider(faux.provider)
@@ -169,10 +169,11 @@ test('cache: a new run changes only the newest message, and no run view is store
   for (let i = 1; i < bodies.length; i++) {
     const prev = bodies[i - 1]
     const lastUser = prev.input.findLastIndex((m) => (m as { role?: string }).role === 'user')
-    for (let k = 0; k < lastUser; k++) assert.deepEqual(bodies[i].input[k], prev.input[k], `request ${i + 1}: item ${k} changed`)
-    // The older crash is not carried along in earlier messages.
-    assert.doesNotMatch(JSON.stringify(bodies[i].input.slice(0, lastUser + 1)), /NameError on line 10/, `request ${i + 1}: an old run view stayed in the history`)
+    // Each request only grows: everything sent before, the older run views included, goes again unchanged.
+    for (let k = 0; k < prev.input.length; k++) assert.deepEqual(bodies[i].input[k], prev.input[k], `request ${i + 1}: item ${k} changed`)
   }
+  // The newest message says how the run ended now; the crash stays on the message it was sent with.
+  assert.doesNotMatch(userText(bodies[2]), /NameError on line 10/)
   await coach.close()
   const { readFile, readdir } = await import('node:fs/promises')
   for (const name of await readdir(dir)) {
@@ -181,5 +182,64 @@ test('cache: a new run changes only the newest message, and no run view is store
     for (const marker of ['End of last run.]', 'NameError on line 10 of main.py', 'Second number: 5']) {
       assert.ok(!bytes.includes(marker), `${name} stores a run view (${marker})`)
     }
+  }
+})
+
+/**
+ * Regression (real session check, 2026-11-13): the first request of a new message re-read the whole conversation at
+ * full price. Two causes: the Visualize button swapped the tool list (which sits at the very start of the request),
+ * and each new message stripped the note (editor view, reminder) from the one before and stubbed its tool results.
+ * xAI reuses a request only up to its first changed byte. Now every request between tidy-ups only grows, Visualize
+ * included.
+ */
+test('cache: across buttons and Visualize, each request starts with the whole request before it', async () => {
+  const faux = fauxProvider()
+  const models = createModels()
+  models.setProvider(faux.provider)
+  const contexts: unknown[] = []
+  const opts: Array<{ sessionId?: string } | undefined> = []
+  let line = 2
+  const root = join(import.meta.dirname, 'fixtures', 'session-check', 'calculator')
+  const project: ProjectInfo = { ...PROJECT, root }
+  const coach = track(
+    await Coach.open(join(await mkdtemp(join(tmpdir(), 'bc-cache-grow-')), 's.sqlite'), project, () => undefined, {
+      ports: realPorts(),
+      models,
+      resolveModel: async () => faux.getModel(),
+      editorContext: () => `[BetterCoder editor: File: Program.cs, cursor on line ${line++}\nEnd of editor view.]`
+    })
+  )
+  const reply =
+    (...parts: Array<ReturnType<typeof fauxText> | ReturnType<typeof fauxToolCall>>) =>
+    (ctx: unknown, o: unknown) => (
+      contexts.push(structuredClone(ctx)),
+      opts.push(o as never),
+      fauxAssistantMessage(parts, { stopReason: parts.some((p) => p.type === 'toolCall') ? 'toolUse' : 'stop' })
+    )
+  const board = { title: 'Run', note: 'n', steps: [{ say: 'start', add: [{ type: 'box', id: 'n', label: 'number', text: '23', col: 1, row: 1 }] }] }
+  faux.setResponses([
+    reply(fauxText('**Calculator mostly works**'), fauxToolCall('read_file', { path: 'Program.cs' })),
+    reply(fauxToolCall('show_step', { title: 'Check it', lines: [{ text: 'if not ok ← say so' }] })),
+    reply(fauxToolCall('point_to_code', { path: 'Program.cs', start_line: 5, end_line: 5 })),
+    reply(fauxToolCall('read_file', { path: 'Program.cs' })),
+    reply(fauxToolCall('draw_board', board)),
+    reply(fauxText('**Added it**')),
+    reply(fauxText('**Try the hint**'))
+  ])
+  await coach.send('Where am I?', 'where')
+  await coach.waitForIdle()
+  await coach.send('What next?', 'next')
+  await coach.waitForIdle()
+  await coach.send('Draw it', 'visualize')
+  await coach.waitForIdle()
+  await coach.send('add a task for bad input')
+  await coach.waitForIdle()
+
+  assert.ok(contexts.length >= 6, `expected 6+ requests, got ${contexts.length}`)
+  const bodies = await Promise.all(contexts.map((c, i) => xaiBody(c, opts[i]?.sessionId)))
+  for (let i = 1; i < bodies.length; i++) {
+    assert.deepEqual(bodies[i].tools, bodies[0].tools, `request ${i + 1}: the tool list changed`)
+    const prev = bodies[i - 1].input
+    for (let k = 0; k < prev.length; k++) assert.deepEqual(bodies[i].input[k], prev[k], `request ${i + 1}: item ${k} of the request before changed`)
   }
 })

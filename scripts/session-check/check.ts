@@ -15,6 +15,7 @@ import type { EditorSnapshot } from '../../src/main/ports'
 import type { RunSummary } from '../../src/shared/code'
 import { DEFAULT_PROFILE } from '../../src/shared/profile'
 import { boardOverlaps } from './overlaps'
+import { TIDY_EVERY } from '../../src/main/coach/request'
 
 const ROOT = join(import.meta.dirname, '..', '..')
 const FIXTURES = join(ROOT, 'tests', 'fixtures', 'session-check')
@@ -82,6 +83,10 @@ interface TurnResult {
   overlaps: string[]
   errors: string[]
   answeredQuestion: boolean
+  /** What the turn's first request changed in the request before it (null: it only added to it). */
+  changed: string | null
+  /** This turn tidied the history (old results stubbed, old notes dropped): a planned miss. */
+  tidy: boolean
   fail: string[]
   warn: string[]
 }
@@ -132,9 +137,19 @@ export async function main(args: string[]): Promise<number> {
     const run: RunSummary | null = sc.run
       ? { id: 'run-1', path: sc.run.path, startedAt: Date.now() - 90_000, endedAt: Date.now() - 80_000, exitCode: sc.run.exitCode, stopped: false, output: sc.run.output, error: null, words: null }
       : null
+    // Every request body as pi-ai sends it, to name what changed when the cache missed.
+    const bodies: Array<{ input: unknown[]; tools?: unknown }> = []
+    const watched = new Proxy(models, {
+      get(target, prop, recv) {
+        const v = Reflect.get(target, prop, recv)
+        if (prop !== 'stream' && prop !== 'streamSimple') return typeof v === 'function' ? v.bind(target) : v
+        return (m: unknown, c: unknown, o: { onPayload?: (p: unknown, m: unknown) => unknown } = {}) =>
+          v.call(target, m, c, { ...o, onPayload: (p: unknown, mm: unknown) => (bodies.push(structuredClone(p) as never), o.onPayload?.(p, mm)) })
+      }
+    })
     const coach = await Coach.open(file, project, (e) => events.push(e), {
       ports: realPorts(),
-      models,
+      models: watched,
       resolveModel: currentModel,
       profile: () => DEFAULT_PROFILE,
       editorContext: () => [editorContext(root, project.files, snap), runView(run, Date.now())].filter(Boolean).join('\n'),
@@ -142,11 +157,17 @@ export async function main(args: string[]): Promise<number> {
       tasksContext: () => tasks.forCoach()
     })
 
+    // Learner messages sent in this scenario (a question answered by the check counts too): every TIDY_EVERY-th one
+    // tidies the history, which misses the cache on purpose.
+    let sent = 0
     try {
       for (const p of sc.prompts) {
         process.stdout.write(`${sc.name} · ${p.label} … `)
         const from = events.length
+        const bodiesBefore = bodies.length
         const start = Date.now()
+        const tidy = sent > 0 && sent % TIDY_EVERY === 0
+        sent++
         await coach.send(p.text, p.intent)
         await coach.waitForIdle()
         let answered = false
@@ -154,6 +175,7 @@ export async function main(args: string[]): Promise<number> {
         const asked = lastCard(events.slice(from))
         if (asked?.kind === 'question' && asked.options.length > 0 && !p.want.includes('any-card')) {
           answered = true
+          sent++
           await coach.send(asked.options[0])
           await coach.waitForIdle()
         }
@@ -166,6 +188,8 @@ export async function main(args: string[]): Promise<number> {
         const toolErrors = turn.flatMap((e) => (e.type === 'tool' && e.status === 'error' ? [`${e.label}: ${e.detail}`] : []))
         errors.push(...toolErrors)
         const overlaps = cards.flatMap((c) => (c.kind === 'board' ? boardOverlaps(c.board) : []))
+        const firstBody = bodies.findIndex((_, k) => k >= bodiesBefore)
+        const changed = firstBody > 0 ? firstChange(bodies[firstBody - 1], bodies[firstBody]) : null
         const r: TurnResult = {
           scenario: sc.name,
           label: p.label,
@@ -179,6 +203,8 @@ export async function main(args: string[]): Promise<number> {
           overlaps,
           errors,
           answeredQuestion: answered,
+          changed,
+          tidy,
           fail: [],
           warn: []
         }
@@ -195,7 +221,10 @@ export async function main(args: string[]): Promise<number> {
   // Cache can only be graded once the transcript is read (fillUsage), so it is graded last.
   for (const [i, r] of results.entries()) {
     const firstOfScenario = i === 0 || results[i - 1].scenario !== r.scenario
-    if (!firstOfScenario && r.cachePct !== null && r.cachePct < 50) r.fail.push(`cache missed on the first request (${r.cachePct}% cached)`)
+    if (r.tidy && r.cachePct !== null && r.cachePct < 50) r.warn.push(`tidy-up turn: a planned cache miss (${r.cachePct}% cached)`)
+    else if (!firstOfScenario && r.cachePct !== null && r.cachePct < 50) {
+      r.fail.push(`cache missed on the first request (${r.cachePct}% cached)${r.changed ? `; we changed ${r.changed}` : '; the request only grew, so xAI dropped it'}`)
+    }
   }
 
   printTable(results)
@@ -203,6 +232,20 @@ export async function main(args: string[]): Promise<number> {
   const failed = results.filter((r) => r.fail.length > 0).length
   console.log(`\n${results.length - failed} of ${results.length} turns passed. Report: ${join(out, 'report.json')}`)
   return failed > 0 ? 1 : 0
+}
+
+/** The first thing in `cur` that differs from `prev` (tools, or an input item), or null when `cur` only extends it. */
+function firstChange(prev: { input: unknown[]; tools?: unknown }, cur: { input: unknown[]; tools?: unknown }): string | null {
+  if (JSON.stringify(prev.tools) !== JSON.stringify(cur.tools)) return 'the tool list'
+  for (let k = 0; k < prev.input.length; k++) {
+    const a = JSON.stringify(prev.input[k])
+    const b = JSON.stringify(cur.input[k])
+    if (a === b) continue
+    let c = 0
+    while (c < a.length && a[c] === b?.[c]) c++
+    return `input item ${k} of ${prev.input.length} at char ${c}: "${a.slice(Math.max(0, c - 40), c + 60)}" → "${(b ?? '(gone)').slice(Math.max(0, c - 40), c + 60)}"`
+  }
+  return null
 }
 
 function lastCard(events: HarnessEvent[]): Extract<Card, { kind: 'question' }> | null {
