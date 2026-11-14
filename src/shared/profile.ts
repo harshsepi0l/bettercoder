@@ -47,7 +47,16 @@ export interface LearnerProfile {
   skills: Skill[]
   /** How step cards show real code next to pseudocode; unset until they pick (the card asks, with previews). */
   codeView?: CodeView
+  /** The app's look: dark (black with red), light (the same look in daylight), or the system's; unset = system. */
+  theme?: Theme
 }
+
+export type Theme = 'system' | 'dark' | 'light'
+export const THEMES: Array<{ id: Theme; label: string }> = [
+  { id: 'system', label: 'Match my computer' },
+  { id: 'dark', label: 'Dark' },
+  { id: 'light', label: 'Light' }
+]
 
 /** highlight: pick a line, see the official example with it lit · stepper: one line at a time. */
 export type CodeView = 'highlight' | 'stepper'
@@ -64,7 +73,8 @@ export function cleanProfile(raw: unknown): LearnerProfile {
   const skills = Array.isArray(r.skills) ? r.skills.flatMap((x) => cleanSkill(x) ?? []).slice(-MAX_SKILLS) : []
   const codeView = r.codeView === 'highlight' || r.codeView === 'stepper' ? (r.codeView as CodeView) : undefined
   // An old `editor` choice ("own" editor link) is dropped: the Code tab's VS Code is the only editor now.
-  return { styles, notes, onboarded: r.onboarded === true, skills, ...(codeView ? { codeView } : {}) }
+  const theme = r.theme === 'dark' || r.theme === 'light' || r.theme === 'system' ? (r.theme as Theme) : undefined
+  return { styles, notes, onboarded: r.onboarded === true, skills, ...(codeView ? { codeView } : {}), ...(theme ? { theme } : {}) }
 }
 
 const LEVEL_IDS = new Set<string>(SKILL_LEVELS.map((l) => l.id))

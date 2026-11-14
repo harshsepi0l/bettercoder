@@ -72,7 +72,7 @@ export function ChatView({
 }
 
 const COACH_CARD =
-  'flex flex-col gap-3 rounded-xl border border-brand-line/25 bg-gradient-to-b from-brand-tint/70 to-brand-tint/20 p-3 shadow-[inset_2px_0_0_var(--brand-line)]'
+  'flex flex-col gap-3 border-l border-brand-line/70 pl-3.5'
 
 /** One broken card must never take the session down with it: it shows a short notice instead. */
 class CardBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

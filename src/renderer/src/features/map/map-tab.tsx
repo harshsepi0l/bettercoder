@@ -128,7 +128,7 @@ function layout(nodes: TreeNode[], open: Set<string>, selected: string | null) {
   })
   const edges: Edge[] = nodes
     .filter((n) => n.parent && visible.has(n.parent))
-    .map((n) => ({ id: `${n.parent}>${n.id}`, source: n.parent!, target: n.id, type: 'smoothstep', style: { stroke: '#5c5c5c', strokeWidth: 1 } }))
+    .map((n) => ({ id: `${n.parent}>${n.id}`, source: n.parent!, target: n.id, type: 'smoothstep', style: { stroke: 'var(--muted-foreground)', strokeWidth: 1 } }))
   return { nodes: flowNodes, edges }
 }
 
@@ -152,7 +152,7 @@ function Relations({ relations, onShow }: { relations: Relation[]; onShow: (r: R
     <div className="flex flex-col gap-3">
       {[...groups.entries()].map(([key, list]) => (
         <section key={key} className="flex flex-col gap-1">
-          <span className="font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
+          <span className="bc-label">
             {RELATION_TITLE[key].toUpperCase()} · {list.length}
           </span>
           {list.map((r) => (
@@ -331,7 +331,7 @@ function Explorer({ map, project, onAsk, onRefresh, loading }: { map: CodeMap; p
           proOptions={{ hideAttribution: true }}
           style={{ background: 'var(--background)' }}
         >
-          <Background gap={20} size={1} color="#3b3b3b" />
+          <Background gap={20} size={1} color="var(--border)" />
           <Controls showInteractive={false} />
         </ReactFlow>
         </div>

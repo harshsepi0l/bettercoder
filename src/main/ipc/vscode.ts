@@ -1,6 +1,7 @@
 import { app, ipcMain, session } from 'electron'
 import { join } from 'node:path'
 import { CODE_IPC, type VscodeFrame } from '../../shared/code'
+import { IPC } from '../../shared/ipc'
 import { CodeServer, withCookie } from '../adapters/code-server'
 import { EditorImporter } from '../adapters/editor-import'
 import { EDITOR_IMPORT_IPC, type EditorSourceId } from '../../shared/editor-import'
@@ -35,6 +36,16 @@ export function registerVscodeIpc({ workspace, getWindow }: IpcContext): { shutd
       }
     )
   }
+
+  // The app's theme changed (or was just worked out at launch): the window's own colours and the editor's theme.
+  ipcMain.handle(IPC.setTheme, async (_e, theme: unknown) => {
+    const shown = theme === 'light' ? 'light' : 'dark'
+    const win = getWindow()
+    const bg = shown === 'light' ? '#fbfbfa' : '#0f0f10'
+    win?.setBackgroundColor(bg)
+    if (process.platform !== 'darwin') win?.setTitleBarOverlay?.({ color: bg, symbolColor: shown === 'light' ? '#2a2a2d' : '#d6d4cf' })
+    await server.setTheme(shown).catch((e) => console.log('[vscode] theme:', e))
+  })
 
   ipcMain.handle(CODE_IPC.vscodeUrl, async (): Promise<VscodeFrame> => {
     if (!server.available()) return { kind: 'problem', message: 'VS Code is not downloaded yet. Run: npm run vscode:fetch' }

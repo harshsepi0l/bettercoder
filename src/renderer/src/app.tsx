@@ -21,6 +21,7 @@ import { Onboarding } from '@/features/profile/onboarding'
 import { CodeViewContext } from '@/features/coach/code-view'
 import { BoardOpenContext } from '@/features/visualize/board-open'
 import { ErrorBoundary } from '@/features/shell/error-boundary'
+import { useApplyTheme } from '@/features/settings/theme'
 
 const SIDEBAR_KEY = 'bettercoder.sidebar-open'
 
@@ -210,6 +211,9 @@ export function App() {
     setBoard(id)
     setMode('visualize')
   }
+
+  // The app's look: their pick in Settings › You, or the computer's (dark until settings load).
+  useApplyTheme(settings ? settings.profile.theme : null)
 
   // How step cards show real code: the learner's pick from onboarding or Settings, saved with their profile.
   const codeView = { view: settings?.profile.codeView }

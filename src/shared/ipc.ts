@@ -1,6 +1,7 @@
 /** Channel names and payloads shared by main, preload and renderer. */
 export const IPC = {
-  setPinned: 'window:set-pinned'
+  setPinned: 'window:set-pinned',
+  setTheme: 'window:set-theme'
 } as const
 
 export interface ProjectInfo {
@@ -31,4 +32,6 @@ export interface BetterCoderApi {
   /** Same values as Node's process.platform. */
   platform: 'aix' | 'android' | 'darwin' | 'freebsd' | 'haiku' | 'linux' | 'openbsd' | 'sunos' | 'win32' | 'cygwin' | 'netbsd'
   setPinned(pinned: boolean): Promise<boolean>
+  /** The theme on screen changed: the window's own colours and VS Code's theme follow. */
+  setTheme(theme: 'dark' | 'light'): Promise<void>
 }

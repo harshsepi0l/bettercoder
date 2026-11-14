@@ -1,7 +1,7 @@
 {
   "name": "bettercoder-ide",
   "displayName": "BetterCoder",
-  "description": "Links the editor to the BetterCoder coach: it sees where you are, labels where the next step goes with its official line from the docs, and runs your file with ▶ Run. It never writes into your files.",
+  "description": "Links the editor to the BetterCoder coach: it sees where you are, labels where the next step goes with its official line from the docs, and runs your file with \u25b6 Run. It never writes into your files.",
   "version": "0.1.0",
   "publisher": "bettercoder",
   "private": true,
@@ -41,6 +41,11 @@
         "label": "BetterCoder Dark",
         "uiTheme": "vs-dark",
         "path": "./themes/bettercoder-dark.json"
+      },
+      {
+        "label": "BetterCoder Light",
+        "uiTheme": "vs",
+        "path": "./themes/bettercoder-light.json"
       }
     ],
     "menus": {

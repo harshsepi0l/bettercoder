@@ -142,7 +142,7 @@ export function SourcesTab({
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 p-3.5">
         <section className="flex flex-col gap-2">
-          <h2 className="font-mono text-[10px] tracking-[0.06em] text-muted-foreground">FROM THIS SESSION</h2>
+          <h2 className="bc-label">FROM THIS SESSION</h2>
           {session.length === 0 ? (
             <p className="text-[12.5px] text-muted-foreground">No links yet. Docs the coach points you to will appear here.</p>
           ) : (
@@ -160,7 +160,7 @@ export function SourcesTab({
         </section>
 
         <section className="flex flex-col gap-2">
-          <h2 className="font-mono text-[10px] tracking-[0.06em] text-muted-foreground">DOCS FOR WHAT YOUR PROJECT USES</h2>
+          <h2 className="bc-label">DOCS FOR WHAT YOUR PROJECT USES</h2>
           {stack === null ? (
             <p className="flex items-center gap-2 text-[12.5px] text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />

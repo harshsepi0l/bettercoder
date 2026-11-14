@@ -17,7 +17,7 @@ export function EmptyState({
       <div className="flex size-10 items-center justify-center rounded-lg border bg-card text-brand-text">
         <Icon className="size-5" aria-hidden="true" />
       </div>
-      <h2 className="text-sm font-medium text-heading">{title}</h2>
+      <h2 className="font-serif text-[19px] font-normal text-heading">{title}</h2>
       <p className="text-[13px] leading-relaxed text-muted-foreground">{children}</p>
       {action}
     </div>

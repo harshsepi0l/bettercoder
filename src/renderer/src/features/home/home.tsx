@@ -40,7 +40,7 @@ export function Home({
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex w-full max-w-4xl flex-col gap-7 px-6 py-10">
         <div className="flex flex-col gap-1.5">
-          <h1 className="text-[26px] font-semibold tracking-tight text-heading">What are we working on?</h1>
+          <h1 className="font-serif text-[32px] leading-tight font-normal tracking-tight text-heading">What are we working on?</h1>
           <p className="text-[14px] text-muted-foreground">Bring code you have, or start from nothing.</p>
         </div>
 
@@ -48,7 +48,7 @@ export function Home({
           <section className="flex flex-col gap-3.5 rounded-xl border bg-card p-5" aria-labelledby="have-code">
             <FolderOpen className="size-6 text-brand-text" aria-hidden="true" />
             <div className="flex flex-col gap-1">
-              <h2 id="have-code" className="text-[16px] font-semibold text-heading">
+              <h2 id="have-code" className="font-serif text-[21px] font-normal text-heading">
                 I have code
               </h2>
               <p className="text-[13px] leading-relaxed text-muted-foreground">
@@ -69,7 +69,7 @@ export function Home({
           <section className="flex flex-col gap-3.5 rounded-xl border border-brand-line/70 bg-card p-5" aria-labelledby="start-new">
             <Lightbulb className="size-6 text-brand-text" aria-hidden="true" />
             <div className="flex flex-col gap-1">
-              <h2 id="start-new" className="text-[16px] font-semibold text-heading">
+              <h2 id="start-new" className="font-serif text-[21px] font-normal text-heading">
                 Start something new
               </h2>
               <p className="text-[13px] leading-relaxed text-muted-foreground">
@@ -118,7 +118,7 @@ export function Home({
 
         {recent.length > 0 && (
           <section className="flex flex-col gap-2" aria-labelledby="recent">
-            <h2 id="recent" className="font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
+            <h2 id="recent" className="bc-label">
               PICK UP WHERE YOU LEFT OFF
             </h2>
             <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">

@@ -80,7 +80,7 @@ export function DocExampleView({ url, term, level = 'basics', className }: { url
 
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <div className="flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
+      <div className="flex items-center gap-1.5 bc-label">
         <BadgeCheck className="size-3 text-status-done" aria-hidden="true" />
         OFFICIAL EXAMPLE · {host(example.url)}
       </div>

@@ -51,7 +51,7 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
   return (
     <ScrollArea className="min-h-0 flex-1">
       <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col items-center gap-6 px-4 py-10">
-        <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.06em] text-muted-foreground" aria-label={`Step ${step + 1} of ${STEPS}`}>
+        <div className="flex items-center gap-2 bc-label" aria-label={`Step ${step + 1} of ${STEPS}`}>
           {Array.from({ length: STEPS }, (_, i) => (
             <span key={i} className={cn('h-1 w-6 rounded-full', i <= step ? 'bg-brand-line' : 'bg-border')} />
           ))}
@@ -60,7 +60,7 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
           </span>
         </div>
         <div className="flex flex-col items-center gap-2 text-center">
-          <h1 className="text-[26px] font-semibold tracking-tight text-heading">{TITLES[at][0]}</h1>
+          <h1 className="font-serif text-[32px] leading-tight font-normal tracking-tight text-heading">{TITLES[at][0]}</h1>
           <p className="text-[14px] text-muted-foreground">{TITLES[at][1]}</p>
         </div>
 
@@ -68,7 +68,7 @@ export function Onboarding({ state, onDone }: { state: SettingsState; onDone: ()
           <div className="grid w-full grid-cols-1 gap-6 md:grid-cols-[1.15fr_1fr]">
             <StyleEditor profile={draft} onChange={setDraft} idPrefix="onboarding" />
             <div className="flex flex-col gap-2">
-              <span className="font-mono text-[10.5px] tracking-[0.06em] text-muted-foreground">PREVIEW</span>
+              <span className="bc-label">PREVIEW</span>
               <div className="flex flex-col gap-3 rounded-xl border bg-chrome p-4 text-[13px]">
                 <div className="max-w-[80%] self-end rounded-lg bg-accent px-3 py-2 text-heading">why does my list skip the last item?</div>
                 <div className="flex flex-col gap-1 leading-relaxed">

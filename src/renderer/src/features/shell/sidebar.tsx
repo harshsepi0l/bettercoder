@@ -172,11 +172,11 @@ function ProjectFlyout({
         <DropdownMenuLabel className="flex items-center gap-2 border-b pb-2">
           <ProjectIcon kind={project.kind} className="size-4.5" />
           <span className="flex min-w-0 flex-col">
-            <span className="font-mono text-[9.5px] font-normal tracking-[0.08em] text-muted-foreground">PROJECT</span>
+            <span className="bc-label">PROJECT</span>
             <span className="truncate text-[13.5px] text-heading">{project.name}</span>
           </span>
         </DropdownMenuLabel>
-        <div className="px-2 pt-1.5 pb-1 font-mono text-[9.5px] tracking-[0.08em] text-muted-foreground">
+        <div className="px-2 pt-1.5 pb-1 bc-label">
           SESSIONS IN THIS PROJECT · {project.sessions.length}
         </div>
         <div className="max-h-72 overflow-y-auto">
@@ -269,7 +269,7 @@ export function Sidebar({ workspace, atHome, onHome, onNewIdea, profile, onOpenP
       </div>
 
       <div className="flex items-center justify-between px-3 pt-2 pb-1">
-        <span className="font-mono text-[10px] tracking-[0.06em] text-muted-foreground">PROJECTS</span>
+        <span className="bc-label">PROJECTS</span>
         <Tooltip>
           <TooltipTrigger asChild>
             <Button variant="ghost" size="icon-xs" aria-label="Open a folder or files" onClick={() => workspace.open()}>

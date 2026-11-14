@@ -10,7 +10,8 @@ import { TASKS_IPC, type TasksApi, type TasksUpdate } from '../shared/tasks'
 
 const api: BetterCoderApi = {
   platform: process.platform,
-  setPinned: (pinned) => ipcRenderer.invoke(IPC.setPinned, pinned)
+  setPinned: (pinned) => ipcRenderer.invoke(IPC.setPinned, pinned),
+  setTheme: (theme) => ipcRenderer.invoke(IPC.setTheme, theme)
 }
 
 function listen<T>(channel: string, listener: (value: T) => void): () => void {
