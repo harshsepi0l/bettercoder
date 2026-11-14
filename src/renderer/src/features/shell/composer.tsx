@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ArrowRight, Compass, ListChecks, LifeBuoy, Send, ShieldCheck, Square, X } from 'lucide-react'
+import { ArrowRight, Compass, Eraser, ListChecks, LifeBuoy, Send, ShieldCheck, Square, X } from 'lucide-react'
 import type { CoachIntent, TurnUsage } from '../../../../shared/harness'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -25,7 +25,8 @@ export function Composer({
   onStop,
   hasCode = true,
   about = null,
-  onClearAbout
+  onClearAbout,
+  onClearChat
 }: {
   /** False for an idea with no folder yet. */
   hasCode?: boolean
@@ -39,8 +40,13 @@ export function Composer({
   usage: TurnUsage | null
   onSend: (text: string, intent?: CoachIntent) => void
   onStop: () => void
+  /** Clear chat: start the session's conversation fresh (tasks stay). Unset when there is nothing to clear. */
+  onClearChat?: () => Promise<void>
 }) {
   const [text, setText] = useState('')
+  // Clear chat asks once, right there (no dialog).
+  const [confirming, setConfirming] = useState(false)
+  const [clearing, setClearing] = useState(false)
   const input = useRef<HTMLTextAreaElement>(null)
   const disabled = disabledReason !== null
   // Asked about a task: the cursor goes to the box.
@@ -121,12 +127,53 @@ export function Composer({
           )}
         </form>
         <div className="flex items-center justify-between gap-2 font-mono text-[10px] tracking-[0.04em] text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <ShieldCheck className="size-3 text-brand-text" aria-hidden="true" />
-            NO CODE · READ-ONLY ACCESS
-          </span>
-          {usage && (
-            <span
+          {!confirming && (
+            <span className="flex items-center gap-1.5 whitespace-nowrap" title="The coach never writes code and only reads your files">
+              <ShieldCheck className="size-3 text-brand-text" aria-hidden="true" />
+              NO CODE · READ-ONLY
+            </span>
+          )}
+          <span className="flex-1" />
+          {onClearChat &&
+            (confirming ? (
+              <span className="flex items-center gap-1.5 whitespace-nowrap">
+                <span title="The coach forgets this chat; your tasks stay">CLEAR THE CHAT? TASKS STAY.</span>
+                <button
+                  type="button"
+                  disabled={clearing}
+                  className="rounded px-1 font-semibold text-status-missing hover:bg-accent/50"
+                  onClick={async () => {
+                    setClearing(true)
+                    try {
+                      await onClearChat()
+                    } catch {
+                      // Nothing was cleared: the chat stays as it was.
+                    } finally {
+                      setClearing(false)
+                      setConfirming(false)
+                    }
+                  }}
+                >
+                  {clearing ? 'CLEARING…' : 'YES, CLEAR'}
+                </button>
+                <button type="button" className="rounded px-1 hover:bg-accent/50" onClick={() => setConfirming(false)}>
+                  CANCEL
+                </button>
+              </span>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                title="Start this session's chat fresh: the coach forgets it, your tasks stay"
+                className="flex items-center gap-1 whitespace-nowrap rounded px-1 hover:bg-accent/50 hover:text-foreground disabled:opacity-40"
+                onClick={() => setConfirming(true)}
+              >
+                <Eraser className="size-3" aria-hidden="true" />
+                CLEAR
+              </button>
+            ))}
+          {usage && !confirming && (
+            <span className="whitespace-nowrap"
               title={`New = tokens processed fresh (what mostly counts). Cached = context the provider reused at a large discount (${formatTokens(usage.cacheRead)} tokens, ${cacheShare(usage)}% of what was read).`}
             >
               {formatTokens(usage.input + usage.output)} NEW · {cacheShare(usage)}% CACHED

@@ -145,6 +145,12 @@ export class WorkspaceStore implements SessionStore {
     await writeJson(this.tasksFile(record), tasks)
   }
 
+  /** Forget a session's conversation (its pi-durable SQLite files); the session, its title and tasks stay. */
+  async clearConversation(record: Pick<SessionRecord, 'id' | 'projectId'>): Promise<void> {
+    const base = join(this.sessionsDir(record.projectId), record.id)
+    for (const suffix of ['.sqlite', '.sqlite-wal', '.sqlite-shm']) await rm(`${base}${suffix}`, { force: true })
+  }
+
   async deleteSession(sessionId: string): Promise<void> {
     const s = await this.getSession(sessionId)
     if (!s) return

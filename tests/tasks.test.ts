@@ -188,3 +188,42 @@ test('regression: a session from before Tasks brings its old progress tasks over
   tasks.coachSet({ id: 't4', title: 'Handle bad input', doneWhen: 'Run it with abc: it asks again', answer: 'Please type a number' })
   assert.equal(tasks.view()[3].status, 'open')
 })
+
+test('Clear chat: the conversation starts fresh (the coach forgets it), the title and tasks stay, and the session works on', async () => {
+  const dataDir = await mkdtemp(join(tmpdir(), 'bc-clear-ws-'))
+  const projectDir = await mkdtemp(join(tmpdir(), 'bc-clear-proj-'))
+  await writeFile(join(projectDir, 'calc.py'), 'a = input()\n')
+  const faux = fauxProvider()
+  const models = createModels()
+  models.setProvider(faux.provider)
+  const events: HarnessEvent[] = []
+  const controller = new WorkspaceController(new WorkspaceStore(dataDir), {
+    ports: realPorts(),
+    emit: (e) => events.push(e),
+    changed: () => {},
+    models,
+    resolveModel: async () => faux.getModel()
+  })
+  track({ close: () => controller.shutdown() })
+  const first = await controller.openFolder(projectDir)
+  const seen: string[] = []
+  faux.setResponses([
+    fauxAssistantMessage([fauxText('**Start with adding**'), fauxToolCall('set_task', { title: 'Add two numbers', done_when: 'Run it with 7 and 5: it prints the sum', answer: '12' })], { stopReason: 'toolUse' }),
+    (ctx) => {
+      seen.push(JSON.stringify((ctx as { messages: unknown[] }).messages))
+      return fauxAssistantMessage('**Fresh start**')
+    }
+  ])
+  await controller.send('I need a calculator for my homework')
+  for (let i = 0; i < 400 && controller.tasks().tasks.length === 0; i++) await new Promise((r) => setTimeout(r, 5))
+  const cleared = await controller.clearChat(first.session.id)
+  assert.equal(cleared.session.id, first.session.id, 'the same session')
+  assert.equal(cleared.session.title, 'I need a calculator for my homework', 'its title (from the first message) stays')
+  assert.deepEqual(cleared.session.items, [], 'no chat on screen')
+  assert.deepEqual(controller.tasks().tasks.map((t) => t.title), ['Add two numbers'], 'tasks stay')
+
+  await controller.send('hello again')
+  for (let i = 0; i < 400 && seen.length === 0; i++) await new Promise((r) => setTimeout(r, 5))
+  assert.doesNotMatch(seen[0], /calculator for my homework/, 'the coach no longer sees the old conversation')
+  await assert.rejects(controller.clearChat('not-open'), /Open that session first/)
+})

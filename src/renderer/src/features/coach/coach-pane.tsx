@@ -4,7 +4,8 @@ import type { ProjectInfo } from '../../../../shared/ipc'
 import { CoachTab } from '@/features/project/coach-tab'
 import { TaskToasts } from '@/features/tasks/tasks-tab'
 import { CoachActions, useIde } from './ide-meter'
-import { ModeBar } from './mode-bar'
+import { ModeBar, MODES } from './mode-bar'
+import { ErrorBoundary } from '@/features/shell/error-boundary'
 import type { Coach } from './use-coach'
 
 /**
@@ -57,19 +58,25 @@ export function CoachPane({
           {/* The chat, with task notifications over its top. */}
           <div className="relative flex min-h-0 flex-1 flex-col">
             {project?.root && <TaskToasts onView={() => onModeChange('tasks')} />}
-            <CoachTab
-              project={project}
-              onOpenProject={onOpenProject}
-              coach={coach}
-              hasModel={hasModel}
-              onOpenSettings={onOpenSettings}
-              typed={step ? { id: step.id, n: written } : undefined}
-            />
+            <ErrorBoundary label="The chat" resetKey={project?.root ?? ''}>
+              <CoachTab
+                project={project}
+                onOpenProject={onOpenProject}
+                coach={coach}
+                hasModel={hasModel}
+                onOpenSettings={onOpenSettings}
+                typed={step ? { id: step.id, n: written } : undefined}
+              />
+            </ErrorBoundary>
           </div>
           {children}
         </>
       ) : (
-        <div className="flex min-h-0 flex-1 flex-col">{panel}</div>
+        <div className="flex min-h-0 flex-1 flex-col">
+          <ErrorBoundary label={MODES.find((m) => m.id === mode)?.label ?? 'This view'} resetKey={mode}>
+            {panel}
+          </ErrorBoundary>
+        </div>
       )}
     </div>
   )

@@ -18,7 +18,6 @@ export function StepChecks({ card, onNext }: { card: StepCardData; onNext: (text
   const [running, setRunning] = useState(false)
   const [error, setError] = useState('')
   const checks = card.checks ?? []
-  if (checks.length === 0) return null
   const last = update.steps?.[stepKey(card.title, checks)]
   const task = card.of ? update.tasks.find((t) => t.id === card.of!.taskId) : undefined
   const total = task?.steps.length ?? 0

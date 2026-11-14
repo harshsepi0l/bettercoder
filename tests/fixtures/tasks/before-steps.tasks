@@ -1,0 +1,1 @@
+[{"id":"t1","title":"Add two numbers","by":"coach","doneWhen":"Run it, type 12, then 5, then +: it prints the sum","answer":"17","status":"open","check":null,"createdAt":1794630501115},{"id":"t2","title":"Multiply two numbers","by":"coach","doneWhen":"Run it, type 7, then 5, then *: it prints the product","answer":"35","status":"open","check":null,"createdAt":1794630501115}]

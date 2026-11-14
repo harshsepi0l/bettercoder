@@ -116,15 +116,18 @@ export class SessionTasks {
     if (input.id && !existing) throw new Error(`There is no task ${input.id}. Leave id out to add a new one.`)
     if (existing) {
       const changedCheck = existing.answer !== answer || existing.doneWhen !== doneWhen
+      const nextSteps = planned.length ? planned.map((t) => ({ title: t, passed: !!existing.steps?.find((s) => s.title === t)?.passed })) : existing.steps
+      // A task with steps is done exactly when all of them passed (a new step reopens it).
+      const stepsDone = nextSteps?.length ? nextSteps.every((s) => s.passed) : null
       const next: StoredTask = {
         ...existing,
         title,
         doneWhen,
         answer,
         // A step keeps its pass when its title stays.
-        steps: planned.length ? planned.map((t) => ({ title: t, passed: !!existing.steps?.find((s) => s.title === t)?.passed })) : existing.steps,
+        steps: nextSteps,
         // A new check opens the task again; the same check keeps a done task done.
-        status: existing.status === 'done' && !changedCheck ? 'done' : 'open',
+        status: stepsDone !== null ? (stepsDone ? 'done' : 'open') : existing.status === 'done' && !changedCheck ? 'done' : 'open',
         check: changedCheck ? null : existing.check
       }
       this.tasks = this.tasks.map((t) => (t.id === existing.id ? next : t))

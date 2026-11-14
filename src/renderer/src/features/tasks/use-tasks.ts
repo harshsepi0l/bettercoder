@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { TaskNotice, TasksUpdate } from '../../../../shared/tasks'
+import { wholeUpdate, type TaskNotice, type TasksUpdate } from '../../../../shared/tasks'
 
 /** How long a notification stays (it shows a bar running down). */
 export const NOTICE_MS = 6000
@@ -23,8 +23,9 @@ export function useTasks(): { update: TasksUpdate; notices: ShownNotice[]; dismi
 
   useEffect(() => {
     let live = true
-    void window.tasks.list().then((u) => live && setUpdate(u))
-    const off = window.tasks.onChanged((u) => {
+    void window.tasks.list().then((u) => live && setUpdate(wholeUpdate(u)))
+    const off = window.tasks.onChanged((raw) => {
+      const u = wholeUpdate(raw)
       setUpdate((before) => {
         // Another session: its notifications go.
         if (before.sessionId !== u.sessionId) setNotices([])
@@ -54,8 +55,8 @@ export function useTasksUpdate(): TasksUpdate {
   const [update, setUpdate] = useState<TasksUpdate>({ sessionId: null, tasks: [] })
   useEffect(() => {
     let live = true
-    void window.tasks.list().then((u) => live && setUpdate(u))
-    const off = window.tasks.onChanged(setUpdate)
+    void window.tasks.list().then((u) => live && setUpdate(wholeUpdate(u)))
+    const off = window.tasks.onChanged((u) => setUpdate(wholeUpdate(u)))
     return () => {
       live = false
       off()

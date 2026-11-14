@@ -88,6 +88,8 @@ export interface SessionStore {
   /** The session's tasks; null when they were never saved (a session from before Tasks). */
   loadTasks(record: Pick<SessionRecord, 'id' | 'projectId'>): Promise<StoredTask[] | null>
   saveTasks(record: Pick<SessionRecord, 'id' | 'projectId'>, tasks: readonly StoredTask[]): Promise<void>
+  /** Forget a session's conversation; the session, its title and its tasks stay. */
+  clearConversation(record: Pick<SessionRecord, 'id' | 'projectId'>): Promise<void>
   deleteSession(sessionId: string): Promise<void>
   deleteProject(projectId: string): Promise<void>
   list(): Promise<ProjectSummary[]>

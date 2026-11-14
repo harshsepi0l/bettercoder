@@ -44,6 +44,7 @@ const workspace: WorkspaceApi = {
   newSession: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.newSession, projectId),
   openSession: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.openSession, sessionId),
   renameSession: (sessionId, title) => ipcRenderer.invoke(WORKSPACE_IPC.renameSession, sessionId, title),
+  clearChat: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.clearChat, sessionId),
   deleteSession: (sessionId) => ipcRenderer.invoke(WORKSPACE_IPC.deleteSession, sessionId),
   deleteProject: (projectId) => ipcRenderer.invoke(WORKSPACE_IPC.deleteProject, projectId),
   onChanged: (listener) => listen<void>(WORKSPACE_IPC.changed, () => listener())

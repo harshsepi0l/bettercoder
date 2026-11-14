@@ -51,6 +51,8 @@ const OFFICIAL_SCHEME = 'bettercoder-official'
 let runProblems
 /** The "▶ Run" terminal of the latest run: { id, file, done, terminal, write }. */
 let runTerm = null
+/** The "▶ Check" terminal of a step's Check (separate from ▶ Run). */
+let checkTerm = null
 const timers = new Map()
 const decoder = new TextDecoder()
 
@@ -471,26 +473,26 @@ async function runFile(uri) {
 function showCheckRun(m) {
   const label = typeof m.label === 'string' ? m.label.slice(0, 60) : 'Check'
   const heading = `${PINK}◆ ${label}${RESET} ${DIM}${path.basename(m.file)}${RESET}\r\n`
-  if (runTerm && runTerm.check) {
-    runTerm.id = m.runId
-    runTerm.done = false
-    runTerm.write.fire(`\r\n${heading}`)
-    runTerm.terminal.show(true)
+  // Its own terminal, beside theirs: a program they are running in ▶ Run keeps its terminal.
+  if (checkTerm) {
+    checkTerm.id = m.runId
+    checkTerm.done = false
+    checkTerm.write.fire(`\r\n${heading}`)
+    checkTerm.terminal.show(true)
     return
   }
-  if (runTerm) runTerm.terminal.dispose()
   const write = new vscode.EventEmitter()
   const state = { id: m.runId, file: m.file, done: false, terminal: null, write, check: true }
   const pty = {
     onDidWrite: write.event,
     open: () => write.fire(heading),
     close: () => {
-      if (runTerm === state) runTerm = null
+      if (checkTerm === state) checkTerm = null
     },
     handleInput: () => {}
   }
   state.terminal = vscode.window.createTerminal({ name: '▶ Check', pty, iconPath: new vscode.ThemeIcon('pass') })
-  runTerm = state
+  checkTerm = state
   state.terminal.show(true)
 }
 
@@ -500,8 +502,10 @@ function finishRun(state, line) {
 }
 
 function onTerm(e) {
-  const t = runTerm
-  if (!t) return
+  for (const t of [runTerm, checkTerm]) if (t) onTermFor(t, e)
+}
+
+function onTermFor(t, e) {
   if (e.type === 'run' && e.run && typeof e.run.id === 'string') {
     if (!t.id && e.run.endedAt === null) t.id = e.run.id
     if (e.run.id !== t.id || e.run.endedAt === null || t.done) return

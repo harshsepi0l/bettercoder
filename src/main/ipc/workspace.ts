@@ -59,6 +59,7 @@ export function registerWorkspaceIpc({ getWindow, ready, workspace }: IpcContext
     return workspace.openSession(asString(sessionId, 'Session'))
   })
 
+  ipcMain.handle(WORKSPACE_IPC.clearChat, (_e, sessionId: unknown) => workspace.clearChat(asString(sessionId, 'Session')))
   ipcMain.handle(WORKSPACE_IPC.renameSession, (_e, sessionId: unknown, title: unknown) =>
     workspace.renameSession(asString(sessionId, 'Session'), asString(title, 'Title'))
   )

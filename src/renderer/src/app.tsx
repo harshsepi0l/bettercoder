@@ -20,6 +20,7 @@ import { Home } from '@/features/home/home'
 import { Onboarding } from '@/features/profile/onboarding'
 import { CodeViewContext } from '@/features/coach/code-view'
 import { BoardOpenContext } from '@/features/visualize/board-open'
+import { ErrorBoundary } from '@/features/shell/error-boundary'
 
 const SIDEBAR_KEY = 'bettercoder.sidebar-open'
 
@@ -147,6 +148,14 @@ export function App() {
       onStop={coach.stop}
       about={about}
       onClearAbout={() => setAbout(null)}
+      onClearChat={
+        sessionId && coach.items.length > 0
+          ? async () => {
+              setAbout(null)
+              await window.workspace.clearChat(sessionId)
+            }
+          : undefined
+      }
     />
   )
   const code = (
@@ -222,6 +231,7 @@ export function App() {
         <div className="flex min-h-0 flex-1">
           {sidebarOpen && (wide ? <Sidebar {...sidebarProps} /> : <SidebarRail {...sidebarProps} />)}
           <main className="flex min-w-0 flex-1 flex-col">
+            <ErrorBoundary label="This session" resetKey={sessionId ?? 'home'}>
             {workspace.error && (
               <div
                 role="alert"
@@ -250,6 +260,7 @@ export function App() {
                 )}
               </>
             )}
+            </ErrorBoundary>
           </main>
         </div>
       )}

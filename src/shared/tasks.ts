@@ -71,6 +71,14 @@ export interface TasksUpdate {
   notice?: TaskNotice
 }
 
+/**
+ * An update as the window receives it, made whole: a task without `steps` (sent by an older main process, or read
+ * from a file written before steps) gets an empty plan, so the Tasks view never reads a missing list.
+ */
+export function wholeUpdate(u: TasksUpdate): TasksUpdate {
+  return { ...u, tasks: (Array.isArray(u?.tasks) ? u.tasks : []).map((t) => ({ ...t, steps: Array.isArray(t.steps) ? t.steps : [] })) }
+}
+
 /** Where Send puts the tasks: a new session in the same project, or one it already has. */
 export type SendTarget = { kind: 'new' } | { kind: 'session'; sessionId: string }
 

@@ -5,7 +5,7 @@ import type { TaskCheck, TaskView } from '../../../../shared/tasks'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { SendTasks } from './send-tasks'
-import { NOTICE_MS, useTasks, type ShownNotice } from './use-tasks'
+import { NOTICE_MS, useTasks, useTasksUpdate, type ShownNotice } from './use-tasks'
 
 type Send = (text: string, intent?: CoachIntent) => void
 
@@ -14,7 +14,8 @@ type Send = (text: string, intent?: CoachIntent) => void
  * this (which hands the task to the coach chat, so the learner asks in their own words). The chat stays free.
  */
 export function TasksTab({ busy, onSend, onAsk }: { busy: boolean; onSend: Send; onAsk: (task: TaskView) => void }) {
-  const { update } = useTasks()
+  // Notifications are TaskToasts' (over the chat); this view only needs the tasks.
+  const update = useTasksUpdate()
   const [selected, setSelected] = useState<string | null>(null)
   const [sending, setSending] = useState(false)
   // Another session: start from its current task.
