@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ArrowRight, Compass, PenLine, ListChecks, LifeBuoy, Send, ShieldCheck, Square, X } from 'lucide-react'
+import { ArrowRight, Compass, ListChecks, LifeBuoy, Send, ShieldCheck, Square, X } from 'lucide-react'
 import type { CoachIntent, TurnUsage } from '../../../../shared/harness'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -8,7 +8,6 @@ import { cn } from '@/lib/utils'
 /** Each button sends a structured intent; the coach is routed by that, not by the words. */
 const CHIPS: Array<{ label: string; icon: typeof LifeBuoy; intent: CoachIntent; message: string }> = [
   { label: "I'm stuck", icon: LifeBuoy, intent: 'stuck', message: "I'm stuck. Help me work out what's going on, without giving me the answer." },
-  { label: 'Visualize', icon: PenLine, intent: 'visualize', message: 'Draw what my code does on the whiteboard.' },
   { label: 'Where am I?', icon: Compass, intent: 'where', message: 'Where am I: what is done, half-built, and missing?' },
   { label: 'What next?', icon: ArrowRight, intent: 'next', message: 'What should I do next?' }
 ]

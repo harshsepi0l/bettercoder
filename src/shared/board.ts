@@ -145,7 +145,8 @@ export function boardProblem(board: Board): string | null {
 // ── Layout ──────────────────────────────────────────────────────────
 
 /** Grid unit in board pixels. */
-export const COL = 150
+/** A grid column: a 120px box plus room between boxes for an arrow and its label. */
+export const COL = 170
 export const ROW = 110
 const BOX_H = 64
 const CELL = 54
@@ -167,8 +168,10 @@ type Placed = Extract<BoardItem, { type: 'box' | 'cells' | 'note' }>
 /** A box's width in grid columns: wide enough for the longest text it ever shows (a change can lengthen it). */
 function boxUnits(it: Extract<BoardItem, { type: 'box' }>, texts: string[]): number {
   if (it.width) return Math.max(1, Math.min(4, it.width))
-  const chars = Math.max(...texts.map((t) => t.length), (it.label ?? '').length)
-  return Math.max(1, Math.min(FLOW_UNITS, Math.ceil((chars * 10 + 40) / COL)))
+  // The text sits inside the shape (about 10px a character); a diamond or circle has about half its width to use.
+  const chars = Math.max(...texts.map((t) => t.length))
+  const need = chars * 10 * (it.shape === 'diamond' || it.shape === 'circle' ? 2 : 1) + 70
+  return Math.max(1, Math.min(FLOW_UNITS, Math.ceil(need / COL)))
 }
 
 /** Plain words broken into lines of at most `max` characters. */
@@ -257,7 +260,7 @@ export function boardScene(board: Board, at: number): Drawn[] {
     if (it.label) out.push({ kind: 'text', id: `${it.id}~label`, x, y: y - LABEL_GAP, text: it.label, size: 'name', lit: isLit(it.id), fresh: isFresh(it.id) })
     if (it.type === 'box') {
       const kind = it.shape === 'circle' ? 'ellipse' : it.shape === 'diamond' ? 'diamond' : 'rect'
-      const w = at.units * COL - 30
+      const w = at.units * COL - 50
       out.push({ kind, id: it.id, x, y, w, h: BOX_H, text: it.text, lit: isLit(it.id), fresh: isFresh(it.id) })
     } else {
       it.items.forEach((v, i) => {

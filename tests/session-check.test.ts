@@ -27,6 +27,14 @@ test('the real MathCalculator board (7 steps, a diamond, arrows, long values) ha
   assert.deepEqual(boardOverlaps(board), [])
 })
 
+test('a diamond gets room for its words, so they never wrap into a taller shape', async () => {
+  const { layoutBoard } = await import('../src/shared/board')
+  const board: Board = { steps: [step({ add: [{ type: 'box', id: 'b', label: 'which op?', text: 'times branch', shape: 'diamond' }, { type: 'box', id: 'v', text: '"23"' }] })] }
+  const at = layoutBoard(board)
+  assert.equal(at.get('b')?.units, 2)
+  assert.equal(at.get('v')?.units, 1)
+})
+
 test('a box with its own label, and a row with its indexes, never count', () => {
   const board: Board = {
     steps: [
