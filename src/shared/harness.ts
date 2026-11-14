@@ -30,6 +30,14 @@ export type ProviderId = string
 /** Buttons the learner pressed. `task`: they added a task, and the coach writes how to check it. */
 export type CoachIntent = 'visualize' | 'stuck' | 'where' | 'next' | 'task'
 
+/**
+ * The coach pane's modes. Chat is the one place the conversation shows and the learner types; the others show their
+ * view alone. A message sent from another mode (Ask on the Map, Draw on Visualize) carries that mode as a tag
+ * (structured UI state, never guessed from words), so the coach knows what they were looking at. Chat sends none.
+ */
+export type CoachMode = 'chat' | 'tasks' | 'visualize' | 'map' | 'sources'
+export const COACH_MODES: readonly CoachMode[] = ['chat', 'tasks', 'visualize', 'map', 'sources']
+
 
 export interface ProviderStatus {
   id: ProviderId
@@ -93,7 +101,7 @@ export type HarnessEvent =
 
 export interface HarnessApi {
   /** `intent` only from buttons; typed text is sent without one. */
-  send(text: string, intent?: CoachIntent): Promise<void>
+  send(text: string, intent?: CoachIntent, mode?: CoachMode): Promise<void>
   abort(): Promise<void>
   onEvent(listener: (event: HarnessEvent) => void): () => void
   getSettings(): Promise<HarnessSettings>

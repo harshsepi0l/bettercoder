@@ -6,8 +6,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { EmptyState } from '@/features/shell/empty-state'
 import { ChatView } from '@/features/coach/chat-view'
 import type { Coach } from '@/features/coach/use-coach'
-import { IdeMeter } from '@/features/coach/ide-meter'
-import { TaskToasts } from '@/features/tasks/tasks-tab'
 
 export function CoachTab({
   project,
@@ -15,21 +13,15 @@ export function CoachTab({
   coach,
   hasModel,
   onOpenSettings,
-  inPane = false,
-  typed,
-  onViewTasks
+  typed
 }: {
   project: ProjectInfo | null
   onOpenProject: () => void
   coach: Coach
   hasModel: boolean
   onOpenSettings: () => void
-  /** In the coach pane beside the editor: the pane shows its own meters row. */
-  inPane?: boolean
   /** The newest step card and how many of its lines they have written. */
   typed?: { id: string; n: number }
-  /** Open the Tasks tab (from a task notification; narrow windows, where the coach is a tab). */
-  onViewTasks?: () => void
 }) {
   if (!project) {
     return (
@@ -51,9 +43,7 @@ export function CoachTab({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {project.root && !inPane && <IdeMeter busy={coach.busy} onSend={coach.send} />}
       <div className="relative flex min-h-0 flex-1 flex-col">
-        {project.root && !inPane && onViewTasks && <TaskToasts onView={onViewTasks} />}
         <ScrollArea className="min-h-0 flex-1">
           <div className="mx-auto flex w-full max-w-3xl flex-col gap-4 p-3.5">
             {coach.items.length === 0 && project.root ? <ProjectCard project={project} /> : <ProjectLine project={project} />}

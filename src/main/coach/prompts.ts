@@ -167,7 +167,7 @@ export function learnerNow(profile: LearnerProfile, languages: readonly string[]
 const FORMAT_REMINDER = 'Format: bold headline (8 words max) + at most 3 short bullets, or just cards. No paragraphs, no filler.'
 
 export type { CoachIntent } from '../../shared/harness'
-import type { CoachIntent } from '../../shared/harness'
+import type { CoachIntent, CoachMode } from '../../shared/harness'
 
 const INTENT_GUIDE: Record<CoachIntent, () => string> = {
   visualize: () =>
@@ -188,8 +188,19 @@ const IDEA_INTENT_GUIDE: Record<CoachIntent, string> = {
 }
 
 /** Added to the newest learner message on every request (not stored in the transcript). */
-export function turnReminder(intent: CoachIntent | null = null, idea = false): string {
-  const guide = intent ? ` ${idea ? IDEA_INTENT_GUIDE[intent] : INTENT_GUIDE[intent]()}` : ''
+/** What the learner was looking at when they sent it, from another mode of the coach pane (Chat adds nothing). */
+const MODE_GUIDE: Record<Exclude<CoachMode, 'chat'>, string> = {
+  tasks: 'They are on Tasks, looking at their task list: talk about their tasks (what one asks, how a run shows it is done, which to do next). Add or fix tasks with set_task when they ask.',
+  visualize: 'They are on Visualize, looking at the whiteboard: answer by drawing with draw_board (read first if you need to; ask_question if it is unclear which part).',
+  map: 'They are on the Map of their project (files, classes, functions and how they connect): answer about how the project fits together; project_outline shows the same map.',
+  sources: 'They are on Sources, the official docs linked in this session: answer about those docs and the ideas in them.'
+}
+
+export function turnReminder(intent: CoachIntent | null = null, idea = false, mode: CoachMode | null = null): string {
+  const intentGuide = intent ? ` ${idea ? IDEA_INTENT_GUIDE[intent] : INTENT_GUIDE[intent]()}` : ''
+  // The Visualize button already says to draw; the mode adds nothing then.
+  const modeGuide = mode && mode !== 'chat' && intent !== 'visualize' ? ` ${idea && mode === 'visualize' ? IDEA_INTENT_GUIDE.visualize : MODE_GUIDE[mode]}` : ''
+  const guide = intentGuide + modeGuide
   return `[BetterCoder reminder: no code of any kind, not even one line, a call, or an expression; if asked for code or syntax, lead with the way forward (not a refusal) and point to the official example or describe the shape in words. ${FORMAT_REMINDER}${guide}]`
 }
 

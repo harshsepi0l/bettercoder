@@ -1,6 +1,6 @@
 import type { Message } from '@earendil-works/pi-ai'
 import { turnReminder } from './prompts'
-import { HIDDEN_PREFIX, readIntent, stripIntent, turnState, textOf, hasCode } from './turn'
+import { HIDDEN_PREFIX, readIntent, readMode, stripIntent, turnState, textOf, hasCode } from './turn'
 
 /**
  * Building each model request so that it only ever grows: a provider re-reads a request at full price from the first
@@ -48,7 +48,8 @@ export function prepareMessages(
       let note = sent.get(key)
       if (note === undefined && i === lastUser) {
         const view = typeof editor === 'function' ? editor() : editor
-        const reminder = turnReminder(readIntent(textOf(m.content)) ?? turnState(messages).intent, idea)
+        const raw = textOf(m.content)
+        const reminder = turnReminder(readIntent(raw) ?? turnState(messages).intent, idea, readMode(raw))
         note = `${view ? `${view}\n\n` : ''}${reminder}`
         sent.set(key, note)
       }

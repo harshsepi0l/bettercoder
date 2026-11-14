@@ -44,6 +44,12 @@ export function TasksTab({ busy, onSend, onAsk }: { busy: boolean; onSend: Send;
             </>
           )}
         </div>
+        {/* The one progress bar in the app: how many of this session's tasks are done. */}
+        {tasks.length > 0 && (
+          <div role="progressbar" aria-label="Tasks done" aria-valuemin={0} aria-valuemax={tasks.length} aria-valuenow={done} className="h-1.5 overflow-hidden rounded-full bg-muted">
+            <div className="h-full rounded-full bg-brand-line transition-[width] duration-300" style={{ width: `${(100 * done) / tasks.length}%` }} />
+          </div>
+        )}
 
         {tasks.length === 0 ? (
           <p className="flex items-center gap-2 text-[12.5px] text-muted-foreground">

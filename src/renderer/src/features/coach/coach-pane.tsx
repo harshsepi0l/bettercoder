@@ -1,14 +1,16 @@
 import { useMemo } from 'react'
+import type { CoachIntent, CoachMode } from '../../../../shared/harness'
 import type { ProjectInfo } from '../../../../shared/ipc'
 import { CoachTab } from '@/features/project/coach-tab'
 import { TaskToasts } from '@/features/tasks/tasks-tab'
-import { IdeMeterRow, useIde } from './ide-meter'
+import { CoachActions, useIde } from './ide-meter'
+import { ModeBar } from './mode-bar'
 import type { Coach } from './use-coach'
 
 /**
- * The coach, beside the learner's work: always on the right, whichever tab is open on the left. One slim row (how it
- * is going), then one chat, with task notifications over its top (the tasks themselves are a tab). The newest step
- * card ticks off the lines they have written in the editor.
+ * The coach, beside the learner's VS Code. Its modes are at the top: Chat is the one and only chat (the conversation,
+ * the composer, task notifications, Get a hint / Next step); Tasks, Visualize, Map and Sources each fill the pane with
+ * their view and no chat. The newest step card ticks off the lines they have written in the editor.
  */
 export function CoachPane({
   project,
@@ -16,7 +18,11 @@ export function CoachPane({
   hasModel,
   onOpenProject,
   onOpenSettings,
-  onViewTasks,
+  mode,
+  onModeChange,
+  locked,
+  panel,
+  onSend,
   children
 }: {
   project: ProjectInfo | null
@@ -24,9 +30,13 @@ export function CoachPane({
   hasModel: boolean
   onOpenProject: () => void
   onOpenSettings: () => void
-  /** Open the Tasks tab (from a notification). */
-  onViewTasks: () => void
-  /** The composer. */
+  mode: CoachMode
+  onModeChange: (mode: CoachMode) => void
+  locked: CoachMode[]
+  /** The open mode's view (Tasks, the whiteboard, the Map, Sources); none in Chat. */
+  panel: React.ReactNode
+  onSend: (text: string, intent?: CoachIntent) => void
+  /** The composer (Chat only). */
   children?: React.ReactNode
 }) {
   const ide = useIde()
@@ -36,24 +46,31 @@ export function CoachPane({
   }, [coach.items])
   // Written lines, as VS Code reports them while they type.
   const written = step ? (ide.stepDone ? step.lines : Math.min(ide.typed, step.lines)) : 0
+  const chat = mode === 'chat' || !project
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {project?.root && <IdeMeterRow busy={coach.busy} onSend={coach.send} />}
-      {/* The chat, with task notifications over its top (below the row above). */}
-      <div className="relative flex min-h-0 flex-1 flex-col">
-        {project?.root && <TaskToasts onView={onViewTasks} />}
-        <CoachTab
-          project={project}
-          onOpenProject={onOpenProject}
-          coach={coach}
-          hasModel={hasModel}
-          onOpenSettings={onOpenSettings}
-          inPane
-          typed={step ? { id: step.id, n: written } : undefined}
-        />
-      </div>
-      {children}
+      {project && <ModeBar mode={mode} onChange={onModeChange} locked={locked} />}
+      {chat ? (
+        <>
+          {project?.root && <CoachActions busy={coach.busy} onSend={onSend} />}
+          {/* The chat, with task notifications over its top. */}
+          <div className="relative flex min-h-0 flex-1 flex-col">
+            {project?.root && <TaskToasts onView={() => onModeChange('tasks')} />}
+            <CoachTab
+              project={project}
+              onOpenProject={onOpenProject}
+              coach={coach}
+              hasModel={hasModel}
+              onOpenSettings={onOpenSettings}
+              typed={step ? { id: step.id, n: written } : undefined}
+            />
+          </div>
+          {children}
+        </>
+      ) : (
+        <div className="flex min-h-0 flex-1 flex-col">{panel}</div>
+      )}
     </div>
   )
 }

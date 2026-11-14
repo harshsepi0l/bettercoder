@@ -2,11 +2,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { lockedSections } from '../../shared/chat'
 import { AlertTriangle, X } from 'lucide-react'
 import { TitleBar } from '@/features/shell/title-bar'
-import { PanelTabs } from '@/features/shell/panel-tabs'
+import { PanelTabs, type NarrowTab } from '@/features/shell/panel-tabs'
 import { Sidebar, SidebarRail, type SidebarProps } from '@/features/shell/sidebar'
 import { SessionBar } from '@/features/shell/session-bar'
 import { Composer } from '@/features/shell/composer'
-import { SectionContent, layoutSections, type SectionId } from '@/features/shell/sections'
+import { ModePanel } from '@/features/shell/sections'
+import { CodeSurface } from '@/features/code/vscode-frame'
+import type { CoachIntent, CoachMode } from '../../shared/harness'
 import { CoachSplit } from '@/features/shell/coach-aside'
 import { CoachPane } from '@/features/coach/coach-pane'
 import { useIsWide } from '@/features/shell/use-is-wide'
@@ -29,7 +31,10 @@ function readSidebarOpen(): boolean {
 }
 
 export function App() {
-  const [section, setSection] = useState<SectionId>('code')
+  // Narrow windows only: VS Code and the coach are two tabs.
+  const [section, setSection] = useState<NarrowTab>('code')
+  // What the coach pane has open (Chat, Tasks, Visualize, Map, Sources). Chat is the only chat.
+  const [mode, setMode] = useState<CoachMode>('chat')
   const [settingsOpen, setSettingsOpen] = useState(false)
   // The task they are asking the coach about, from the Tasks tab.
   const [about, setAbout] = useState<{ id: string; title: string } | null>(null)
@@ -55,25 +60,30 @@ export function App() {
   const isIdea = !!project && !project.root
   const showHome = atHome || !workspace.active
 
-  // Opening or starting a session leaves Home; an idea project starts on the Coach tab.
+  // Opening or starting a session leaves Home, on the code with the coach's chat beside it.
   useEffect(() => {
     if (!sessionId) return
     setAtHome(false)
     setAbout(null)
-    // A session opens on the code; an idea with no folder (in a narrow window) on the coach.
+    setMode('chat')
+    // A narrow window opens on the code; an idea with no folder on the coach.
     setSection(isIdea && !wide ? 'coach' : 'code')
     // Only when the session changes.
   }, [sessionId])
-  // A locked tab (Map and Tasks in an idea) falls back to the first tab. Same rule as the tab row.
-  const locked = useMemo(() => lockedSections(isIdea), [isIdea])
-  // Wide: the coach is a pane beside the Code tab's VS Code.
-  const paneLayout = wide
-  const shown = layoutSections({ wide })
-  const shownSection: SectionId = (locked as SectionId[]).includes(section) || !shown.includes(section) ? shown[0] : section
-  // Also reset what is stored, so a tab that unlocks later (an animation arrives) never jumps open by itself.
+  // Modes an idea can't use yet (Map and Tasks) fall back to Chat.
+  const locked = useMemo(() => lockedSections(isIdea) as CoachMode[], [isIdea])
+  const shownMode: CoachMode = locked.includes(mode) ? 'chat' : mode
   useEffect(() => {
-    if (shownSection !== section) setSection(shownSection)
-  }, [shownSection, section])
+    if (shownMode !== mode) setMode(shownMode)
+  }, [shownMode, mode])
+  // Typed in the chat: no mode tag.
+  const send = (text: string, intent?: CoachIntent) => coach.send(text, intent)
+  // Asked from another mode (Ask on the Map or in Sources, Get a hint on a task, Draw): it carries that mode, and the
+  // answer is read in the chat, the only one, so the pane goes there. Visualize stays: the board lands in its view.
+  const askFromMode = (text: string, intent?: CoachIntent) => {
+    coach.send(text, intent, shownMode)
+    if (shownMode !== 'visualize') setMode('chat')
+  }
 
   // "Open in editor" (Map, a step card's file link) opens the file in VS Code: bring the Code tab to the front.
   useEffect(() => {
@@ -129,37 +139,49 @@ export function App() {
       busy={coach.busy}
       usage={coach.usage}
       hasCode={!isIdea}
-      onSend={coach.send}
+      onSend={send}
       onStop={coach.stop}
       about={about}
       onClearAbout={() => setAbout(null)}
     />
   )
-  const tabs = (
-    <PanelTabs section={shownSection} onSectionChange={setSection} disabled={locked} shown={shown}>
-      <SectionContent
-        section={shownSection}
-        sessionKey={sessionId ?? ''}
-        project={project}
-        onOpenProject={() => workspace.open()}
-        onPickFolder={() => {
-          if (workspace.active) void workspace.linkFolder(workspace.active.project.id)
-        }}
-        coach={coach}
-        hasModel={hasModel}
-        onOpenSettings={() => setSettingsOpen(true)}
-        onAsk={(text, intent) => {
-          // Beside the editor the coach is already on screen; otherwise switch to it.
-          if (!paneLayout) setSection('coach')
-          coach.send(text, intent)
-        }}
-        onViewTasks={() => setSection('tasks')}
-        onAskTask={(task) => {
-          setAbout({ id: task.id, title: task.title })
-          if (!paneLayout) setSection('coach')
-        }}
-      />
-    </PanelTabs>
+  const code = (
+    <CodeSurface
+      sessionKey={sessionId ?? ''}
+      root={project?.root ?? ''}
+      onPickFolder={() => {
+        if (workspace.active) void workspace.linkFolder(workspace.active.project.id)
+      }}
+    />
+  )
+  const coachPane = (
+    <CoachPane
+      project={project}
+      coach={coach}
+      hasModel={hasModel}
+      onOpenProject={() => workspace.open()}
+      onOpenSettings={() => setSettingsOpen(true)}
+      mode={shownMode}
+      onModeChange={setMode}
+      locked={locked}
+      onSend={send}
+      panel={
+        <ModePanel
+          mode={shownMode}
+          project={project}
+          items={coach.items}
+          busy={coach.busy}
+          onAsk={askFromMode}
+          onAskTask={(task) => {
+            // The task goes on the composer as a chip; they type their question in the chat.
+            setAbout({ id: task.id, title: task.title })
+            setMode('chat')
+          }}
+        />
+      }
+    >
+      {composer}
+    </CoachPane>
   )
 
   // How step cards show real code: the learner's pick from onboarding or Settings, saved with their profile.
@@ -199,28 +221,13 @@ export function App() {
               <>
                 {/* Wide: the title bar already names the project and session. */}
                 {!wide && <SessionBar workspace={workspace} />}
-                {paneLayout ? (
-                  // The learner's work on the left, the coach always on the right (resizable).
-                  <CoachSplit
-                    work={tabs}
-                    coach={
-                      <CoachPane
-                        project={project}
-                        coach={coach}
-                        hasModel={hasModel}
-                        onOpenProject={() => workspace.open()}
-                        onOpenSettings={() => setSettingsOpen(true)}
-                        onViewTasks={() => setSection('tasks')}
-                      >
-                        {composer}
-                      </CoachPane>
-                    }
-                  />
+                {wide ? (
+                  // VS Code on the left, the coach always on the right (resizable).
+                  <CoachSplit work={code} coach={coachPane} />
                 ) : (
-                  <>
-                    {tabs}
-                    {shownSection === 'coach' && composer}
-                  </>
+                  <PanelTabs tab={section} onTabChange={setSection}>
+                    {section === 'code' ? code : coachPane}
+                  </PanelTabs>
                 )}
               </>
             )}

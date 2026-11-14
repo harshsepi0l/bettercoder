@@ -104,10 +104,10 @@ src/
     features/
       profile/            onboarding (style → code view → your editor → connect), profile editors, skills view, code view picker, editor-import
       home/               Home: open folder/files, start from an idea, recent sessions
-      shell/              title bar, sidebar + rail, session bar, tabs (layoutSections), composer
+      shell/              title bar, sidebar + rail, session bar, sections.tsx (ModePanel), panel-tabs (narrow: Code | Coach), composer
       code/               the Code tab: vscode-frame.tsx (VS Code in a frame, "Pick a folder" for ideas)
-      coach/              coach-pane.tsx (the coach beside the editor: feeling row + one chat), chat, cards, meters
-      tasks/              tasks-tab.tsx (the Tasks tab, Ask about this, notifications over the coach), send-tasks.tsx
+      coach/              coach-pane.tsx (the coach beside VS Code: mode bar, then the one chat or a mode's view), mode-bar.tsx, chat, cards, ide-meter.tsx (hint / next step buttons)
+      tasks/              tasks-tab.tsx (the Tasks mode, Ask about this, notifications over the coach), send-tasks.tsx
       visualize/          the whiteboard: board-player (steps, play), board-canvas (Excalidraw, lazy), board-elements (look, camera)
       map/ sources/ settings/ workspace/ project/
 ide/vscode/               the BetterCoder extension inside VS Code (plain CommonJS, no build): extension.js, ghost.js, notebook-view.js,
@@ -117,7 +117,7 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 
 ## Data model
 
-- **Project → Session → tabs (Coach, Visualize, Map, Sources).** Map belongs to the project; Coach and Sources to the session.
+- **Project → Session.** A session is VS Code on the left and the coach on the right. The coach has **modes** at the top of its pane (`CoachMode`: Chat, Tasks, Visualize, Map, Sources). **There is one chat, and it shows only in Chat mode** (with the composer); the other modes fill the pane with their view and no chat. Asking from another mode (Ask on the Map, Get a hint on a task) sends with that mode as a `<bc-mode>` tag (structured UI state, like intents; Chat sends none) and switches to Chat, except Visualize, where the board lands in its view. The reminder tells the coach what they were looking at (`MODE_GUIDE` in `prompts.ts`). Map belongs to the project; Tasks and Sources to the session. Narrow windows: Code and Coach become two tabs.
 - Project kinds: `folder`, `files` (individually opened), `idea` (no folder yet, `root: ''`).
   - Idea projects get only the card tools that need no files (including `draw_board`).
   - **Link folder** gives the project a root; its sessions carry on.
@@ -144,7 +144,7 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 
 ## Code tab (VS Code) notes
 
-- The Code tab is code-server (open-source VS Code, `vendor/code-server`), one server for the app on 127.0.0.1, opened on the session's project folder in a frame. A session is the Code tab (and Visualize, Map, Sources) on the left, the coach pane on the right; narrow windows fall back to tabs. Idea projects show "Pick a folder".
+- The Code tab is code-server (open-source VS Code, `vendor/code-server`), one server for the app on 127.0.0.1, opened on the session's project folder in a frame. It is the whole left side of a session; the coach pane (with its modes) is on the right; narrow windows fall back to two tabs. Idea projects show "Pick a folder".
 - Locked: each start makes a random secret passed as code-server's `HASHED_PASSWORD`; the app adds the matching `code-server-session` cookie to its own requests to that port only (`ipc/vscode.ts`). Anything else gets the login page.
 - Its data lives in `userData/vscode` (settings, extensions, `config.yaml`, `port.json`). The port is reused, because VS Code keeps window state in browser storage per address. code-server must always get `--config`, or it writes `~/.config/code-server`.
 - Every start: `FORCED_SETTINGS` go back on (no AI, inline suggestions/inlay hints/snippets/tab completion off, the app's layout), AI extensions are removed (`core/ai-extensions.ts`: known list, AI/Chat category, own language models, inline-completion proposals; hooks for *other* AIs like `languageModelTools` are not AI), other extensions' title-bar Run buttons are hidden (`HIDDEN_RUN_BUTTONS`), and our extension is registered in `extensions.json` (a folder only linked in is "marked as removed").
@@ -154,8 +154,8 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 - Notebooks are reported in the coach's own view (`ide/vscode/notebook-view.js`, kept identical to `core/text-view.ts` by a test): editor lines, markers and "Open in editor" lines are view lines, mapped to cells by the extension.
 - The coach sees the editor through `services/editor-context.ts`, added to the newest learner message on each request and **never stored**. Same rules as the tools: project files only, no secret files, secrets redacted.
 - `show_step` takes `at` (file, line). The editor puts a label above that line (a CodeLens: "◆ step title · See the official line (Method)"); nothing is drawn in their text (no tint, no faded pseudocode: the user removed both, 2026-11-10). The official line is for the pseudocode line they are on (`ghost.js` counts typed lines; the pseudocode itself is never shown). Clicking it asks the app (`official` message), which fetches the example from the official-docs allowlist (`engines/map/doc-examples.ts`, `editorExample`) and the editor opens it in a read-only peek under the line with the method's line lit. It never comes from the model, and the model never sees it.
-- Tasks (no progress bar): a session's tasks, added by the learner or the coach (`set_task`), kept in `<sessionId>.tasks` beside the session. Each has "done when" (inputs, in words) and the coach's answer, sealed: never shown to the learner or put back in front of the coach until it matched. A learner's own task waits until the coach writes its check (the `task` intent). Check my answer compares their last ▶ Run with the answer in `core/task-check.ts` (numbers by value, text ignoring case and spacing), never the model. The coach sees the tasks on the newest message only (`forCoach`, never stored). Tasks are a tab beside Code (locked in ideas), so the chat stays free; notifications show over the top of the coach (View opens the tab). "Ask about this" puts the task on the composer as a chip, and their own words go to the coach as "About my task “…”: …". Send copies tasks, fresh, into a new or existing session of the same project. A session from before Tasks (no `.tasks` file) brings its old `track_progress` list over once, as the coach's tasks waiting for checks; with no tasks the coach is reminded to add them.
-- Feeling comes from editor activity only (`core/feeling.ts`), never from what the learner types. Stuck shows "Get a hint" and a typed-out step shows "Next step"; both send existing intents.
+- Tasks (no progress bar): a session's tasks, added by the learner or the coach (`set_task`), kept in `<sessionId>.tasks` beside the session. Each has "done when" (inputs, in words) and the coach's answer, sealed: never shown to the learner or put back in front of the coach until it matched. A learner's own task waits until the coach writes its check (the `task` intent). Check my answer compares their last ▶ Run with the answer in `core/task-check.ts` (numbers by value, text ignoring case and spacing), never the model. The coach sees the tasks on the newest message only (`forCoach`, never stored). Tasks is a coach mode (locked in ideas), with the one progress bar in the app (tasks done); notifications show over the top of the chat (View opens Tasks mode). "Ask about this" puts the task on the composer as a chip, and their own words go to the coach as "About my task “…”: …". Send copies tasks, fresh, into a new or existing session of the same project. A session from before Tasks (no `.tasks` file) brings its old `track_progress` list over once, as the coach's tasks waiting for checks; with no tasks the coach is reminded to add them.
+- Feeling comes from editor activity only (`core/feeling.ts`), never from what the learner types, and is never shown as a word or bar (removed 2026-11-13). Stuck shows "Get a hint" and a typed-out step shows "Next step" (`CoachActions`, Chat mode); both send existing intents.
 
 ## ▶ Run notes
 
@@ -166,6 +166,6 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 
 ## Whiteboard notes
 
-- Visualize is the whiteboard: every board the coach drew in the session, full size (pan and zoom); with none, "Ask the coach to draw it" (the `visualize` intent). Chat cards show the same board small and not interactive.
-- The Visualize button restricts the coach to reading, `ask_question` and `draw_board`; a reply in words is nudged once to draw (`VISUALIZE_NUDGE`).
+- Visualize mode is the whiteboard: every board the coach drew in the session (pan and zoom), filling the pane; with none, "Ask the coach to draw it" (the `visualize` intent). Chat cards show the same board small and not interactive.
+- The Visualize button, and any message sent from Visualize mode (`isDrawing`), restrict the coach to reading, `ask_question` and `draw_board` (`beforeTool`); a reply in words is nudged once to draw (`VISUALIZE_NUDGE`).
 - Excalidraw runs in its light theme on the app's grey (its dark theme inverts canvas colours); its menus are hidden (`.bc-board` in globals.css). The camera frames the board's last step, so it never moves while playing; new things fade in.

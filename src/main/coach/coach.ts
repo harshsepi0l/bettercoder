@@ -21,6 +21,7 @@ import type { HarnessEvent, TurnUsage } from '../../shared/harness'
 import type { ProjectInfo } from '../../shared/ipc'
 import type { CoachPorts } from '../ports'
 import { FALLBACK_REPLY, REWRITE_REQUEST, TOOL_TEXT_REQUEST, VISUALIZE_NUDGE, coachPrompt, learnerNow, learnerPrompt, type CoachIntent } from './prompts'
+import type { CoachMode } from '../../shared/harness'
 import { DEFAULT_PROFILE, type LearnerProfile } from '../../shared/profile'
 import { createOutlineTool } from './tools/outline'
 import { redactSecrets } from '../core/paths'
@@ -29,7 +30,7 @@ import { VISUAL_TOOL_NAMES, createVisualTools } from './tools/cards'
 import { createSkillTool } from './tools/skill'
 import { createTaskTool, type SetTask } from './tools/tasks'
 import type { Skill } from '../../shared/profile'
-import { MAX_REWRITES, MAX_TOOL_CALLS_PER_MESSAGE, MAX_TOOL_RESULT_CHARS, HIDDEN_PREFIX, READ_TOOLS, withIntent, stripIntent, type TurnState, turnState, textOf, MAX_TOOL_RETRIES, typedToolName, withoutToolNames, hasCode, asksQuestion } from './turn'
+import { MAX_REWRITES, MAX_TOOL_CALLS_PER_MESSAGE, MAX_TOOL_RESULT_CHARS, HIDDEN_PREFIX, READ_TOOLS, withIntent, withMode, isDrawing, stripIntent, type TurnState, turnState, textOf, MAX_TOOL_RETRIES, typedToolName, withoutToolNames, hasCode, asksQuestion } from './turn'
 import { describeTool, isToolLine, itemsFromEntries, sumUsage, type AnchoredStep, anchoredStep, lastStepFromEntries, legacyTaskTitles } from './replay'
 import { prepareMessages, cacheSettings, type SentNotes } from './request'
 
@@ -102,7 +103,7 @@ const IDEA_TOOLS = new Set(['ask_question', 'show_diagram', 'show_step', 'draw_b
 export class Coach {
   private stream: AgentEventStream | null = null
   /** Per-request state, recomputed from the transcript before every model request (restart-safe). */
-  private state: TurnState = { intent: null, rewrites: 0, toolRetries: 0, readCalls: 0, drew: false, asked: false, nudged: false }
+  private state: TurnState = { intent: null, mode: null, rewrites: 0, toolRetries: 0, readCalls: 0, drew: false, asked: false, nudged: false }
   /** Read calls made inside the current round, on top of state.readCalls. */
   private roundReads = 0
   /** The current round includes ask_question, so every call in it ends the turn (pi-durable needs all of them to). */
@@ -189,7 +190,7 @@ export class Coach {
               return t.rewrites < MAX_REWRITES ? { continue: REWRITE_REQUEST } : undefined
             }
             if (typedToolName(answer) && t.toolRetries < MAX_TOOL_RETRIES) return { continue: TOOL_TEXT_REQUEST }
-            if (t.intent === 'visualize' && !t.drew && !t.asked && !t.nudged) {
+            if (isDrawing(t) && !t.drew && !t.asked && !t.nudged) {
               return { continue: VISUALIZE_NUDGE }
             }
             return undefined
@@ -201,8 +202,8 @@ export class Coach {
             if (!toolNames.has(call.name)) return { block: 'BetterCoder only allows read-only tools.' }
             // Visualize allows only reading, asking and the whiteboard. Checked here, not by changing the tool list:
             // a different tool list changes the start of the request, so the whole cache would be lost.
-            if (c?.state.intent === 'visualize' && !VISUALIZE_TOOLS.has(call.name)) {
-              return { block: 'The learner pressed Visualize: draw it with draw_board (read first if you need to, or ask_question which part).' }
+            if (c && isDrawing(c.state) && !VISUALIZE_TOOLS.has(call.name)) {
+              return { block: 'The learner is on Visualize: draw it with draw_board (read first if you need to, or ask_question which part).' }
             }
             // Only reading counts against the budget: a card (like a question) must always get through.
             // A blocked call skips afterTool, so it could not end a question's round: let reads in that round through.
@@ -294,7 +295,7 @@ export class Coach {
    * Send the learner's message. `intent` is set only by UI buttons (Visualize,
    * I'm stuck, ...); typed text goes to the model as it is, and the model picks tools.
    */
-  async send(text: string, intent?: CoachIntent): Promise<void> {
+  async send(text: string, intent?: CoachIntent, mode?: CoachMode): Promise<void> {
     const model = await this.deps.resolveModel()
     if (!model) {
       this.emit({ type: 'error', message: 'Connect a model in Settings first.' })
@@ -307,7 +308,8 @@ export class Coach {
     }
     this.shownSinceInput = false
     this.lastShown = ''
-    await this.root.submit({ type: 'input', content: intent ? withIntent(text, intent) : text }, ctx)
+    const tagged = withMode(text, mode)
+    await this.root.submit({ type: 'input', content: intent ? withIntent(tagged, intent) : tagged }, ctx)
   }
 
   async abort(): Promise<void> {

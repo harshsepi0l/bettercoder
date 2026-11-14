@@ -1,7 +1,7 @@
 import { join } from 'node:path'
 import type { Api, Model, Models } from '@earendil-works/pi-ai'
 import { titleFrom } from '../../shared/chat'
-import type { CardUse, CoachIntent, HarnessEvent } from '../../shared/harness'
+import type { CardUse, CoachIntent, CoachMode, HarnessEvent } from '../../shared/harness'
 import type { OpenSession, ProjectSummary } from '../../shared/workspace'
 import type { ProjectInfo } from '../../shared/ipc'
 import type { LearnerProfile, Skill } from '../../shared/profile'
@@ -225,7 +225,7 @@ export class WorkspaceController {
     return this.activate(record)
   }
 
-  async send(text: string, intent?: CoachIntent): Promise<void> {
+  async send(text: string, intent?: CoachIntent, mode?: CoachMode): Promise<void> {
     const active = this.active
     if (!active) {
       this.deps.emit({ type: 'error', message: 'Open a folder or files first.' })
@@ -236,7 +236,7 @@ export class WorkspaceController {
     if (active.record.title === 'New session') active.record.title = titleFrom(text)
     await this.store.saveSession(active.record)
     this.deps.changed()
-    await active.coach.send(text, intent)
+    await active.coach.send(text, intent, mode)
   }
 
   abort(): void {

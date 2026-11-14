@@ -20,7 +20,7 @@ function listen<T>(channel: string, listener: (value: T) => void): () => void {
 }
 
 const harness: HarnessApi = {
-  send: (text, intent) => ipcRenderer.invoke(HARNESS_IPC.send, text, intent),
+  send: (text, intent, mode) => ipcRenderer.invoke(HARNESS_IPC.send, text, intent, mode),
   abort: () => ipcRenderer.invoke(HARNESS_IPC.abort),
   cardUse: (kind) => ipcRenderer.invoke(HARNESS_IPC.cardUse, kind),
   onEvent: (listener) => listen<HarnessEvent>(HARNESS_IPC.event, listener),

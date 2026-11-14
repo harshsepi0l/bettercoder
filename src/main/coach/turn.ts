@@ -1,6 +1,7 @@
 import type { AssistantMessage, Message } from '@earendil-works/pi-ai'
 import { StreamGuard } from '../core/guard'
 import { REWRITE_REQUEST, TOOL_TEXT_REQUEST, VISUALIZE_NUDGE, type CoachIntent } from './prompts'
+import { COACH_MODES, type CoachMode } from '../../shared/harness'
 
 /**
  * Per-turn state, worked out from the stored transcript before every request (restart-safe): the button intent,
@@ -26,13 +27,25 @@ export function readIntent(text: string): CoachIntent | null {
   const m = INTENT_TAG.exec(text)
   return m && INTENTS.has(m[1] as CoachIntent) ? (m[1] as CoachIntent) : null
 }
+/** The pane's mode travels the same way, before any intent tag: `<bc-mode>map</bc-mode>`. Chat sends none. */
+export const MODE_TAG = /\n?<bc-mode>(\w+)<\/bc-mode>\s*$/
+export function withMode(text: string, mode: CoachMode | undefined): string {
+  return mode && mode !== 'chat' ? `${text}\n<bc-mode>${mode}</bc-mode>` : text
+}
+export function readMode(text: string): CoachMode | null {
+  const m = MODE_TAG.exec(text.replace(INTENT_TAG, ''))
+  return m && COACH_MODES.includes(m[1] as CoachMode) ? (m[1] as CoachMode) : null
+}
+/** The learner's words alone: the intent and mode tags taken off. */
 export function stripIntent(text: string): string {
-  return text.replace(INTENT_TAG, '')
+  return text.replace(INTENT_TAG, '').replace(MODE_TAG, '')
 }
 
 /** What has happened since the learner's latest message, worked out from the transcript itself. */
 export interface TurnState {
   intent: CoachIntent | null
+  /** The pane's mode when they sent it (null: Chat). */
+  mode: CoachMode | null
   rewrites: number
   /** Hidden redos because a reply typed a tool's name instead of calling it. */
   toolRetries: number
@@ -52,9 +65,10 @@ export function turnState(messages: readonly Message[]): TurnState {
       break
     }
   }
-  const state: TurnState = { intent: null, rewrites: 0, toolRetries: 0, readCalls: 0, drew: false, asked: false, nudged: false }
+  const state: TurnState = { intent: null, mode: null, rewrites: 0, toolRetries: 0, readCalls: 0, drew: false, asked: false, nudged: false }
   if (last === -1) return state
   state.intent = readIntent(textOf(messages[last].content))
+  state.mode = readMode(textOf(messages[last].content))
   for (const m of messages.slice(last + 1)) {
     if (m.role === 'user') {
       const t = textOf(m.content)
@@ -69,6 +83,11 @@ export function turnState(messages: readonly Message[]): TurnState {
     }
   }
   return state
+}
+
+/** This turn should be drawn: the Visualize button, or any message sent in Visualize mode. */
+export function isDrawing(t: TurnState): boolean {
+  return t.intent === 'visualize' || t.mode === 'visualize'
 }
 
 export function textOf(content: unknown): string {
