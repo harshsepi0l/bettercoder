@@ -223,7 +223,9 @@ export async function main(args: string[]): Promise<number> {
     const firstOfScenario = i === 0 || results[i - 1].scenario !== r.scenario
     if (r.tidy && r.cachePct !== null && r.cachePct < 50) r.warn.push(`tidy-up turn: a planned cache miss (${r.cachePct}% cached)`)
     else if (!firstOfScenario && r.cachePct !== null && r.cachePct < 50) {
-      r.fail.push(`cache missed on the first request (${r.cachePct}% cached)${r.changed ? `; we changed ${r.changed}` : '; the request only grew, so xAI dropped it'}`)
+      // Ours only when we changed what was sent before; xAI drops about 1 request in 3 on its own (2026-11-13).
+      if (r.changed) r.fail.push(`cache missed on the first request (${r.cachePct}% cached); we changed ${r.changed}`)
+      else r.warn.push(`cache missed on the first request (${r.cachePct}% cached), but the request only grew: xAI dropped it`)
     }
   }
 

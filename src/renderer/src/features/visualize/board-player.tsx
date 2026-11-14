@@ -1,5 +1,5 @@
 import { Suspense, lazy, memo, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
-import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react'
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, Maximize2, Pause, Play } from 'lucide-react'
 import { boardScene, type Board } from '../../../../shared/board'
 import { Button } from '@/components/ui/button'
 import { useCodeView } from '@/features/coach/code-view'
@@ -15,7 +15,7 @@ const SPEEDS = [1800, 1100, 600]
  * A whiteboard the coach drew: the board, the line for each step, and play / step controls. Memoised: a card's board
  * never changes, so a streamed reply re-rendering the chat must not redraw every board in it.
  */
-export const BoardPlayer = memo(function BoardPlayer({ board, compact = false }: { board: Board; compact?: boolean }) {
+export const BoardPlayer = memo(function BoardPlayer({ board, compact = false, onExpand }: { board: Board; compact?: boolean; onExpand?: () => void }) {
   const total = board.steps.length
   const [i, setI] = useState(0)
   const [shown, setShown] = useState(0)
@@ -47,8 +47,8 @@ export const BoardPlayer = memo(function BoardPlayer({ board, compact = false }:
   }
 
   return (
-    <div className="flex flex-col gap-2.5 outline-none" tabIndex={0} onKeyDown={onKey} aria-label="Whiteboard. Left and right arrows step, space plays.">
-      <div className={cn('overflow-hidden rounded-md border bg-background', compact ? 'h-60' : 'h-[460px]')}>
+    <div className={cn('flex flex-col gap-2.5 outline-none', !compact && 'min-h-0 flex-1')} tabIndex={0} onKeyDown={onKey} aria-label="Whiteboard. Left and right arrows step, space plays.">
+      <div className={cn('overflow-hidden rounded-md border bg-background', compact ? 'h-72' : 'min-h-[300px] flex-1')}>
         <Suspense fallback={<div className="h-full animate-pulse bg-muted" aria-hidden="true" />}>
           <BoardCanvas drawn={drawn} frame={frame} interactive={!compact} />
         </Suspense>
@@ -83,6 +83,12 @@ export const BoardPlayer = memo(function BoardPlayer({ board, compact = false }:
         <Button variant="ghost" size="xs" onClick={() => setSpeed((s) => (s + 1) % SPEEDS.length)} aria-label="Change speed">
           {['1×', '2×', '3×'][speed]}
         </Button>
+        {onExpand && (
+          <Button variant="outline" size="xs" onClick={onExpand} aria-label="Open this board full size in Visualize">
+            <Maximize2 />
+            Expand
+          </Button>
+        )}
       </div>
     </div>
   )

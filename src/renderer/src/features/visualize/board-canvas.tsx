@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Excalidraw, convertToExcalidrawElements } from '@excalidraw/excalidraw'
 import type { ExcalidrawImperativeAPI } from '@excalidraw/excalidraw/types'
 import '@excalidraw/excalidraw/index.css'
 import type { Drawn } from '../../../../shared/board'
-import { BOARD_COLORS, boardBounds, boardCamera, boardSkeletons } from './board-elements'
+import { BOARD_COLORS, boardBounds, boardSkeletons } from './board-elements'
 
 /** How long new things take to appear on the board. */
 const FADE_MS = 380
@@ -26,18 +26,28 @@ export default function BoardCanvas({ drawn, frame, interactive }: { drawn: Draw
     return () => ro.disconnect()
   }, [])
 
-  // The camera: framed on the whole board (its last step).
-  useEffect(() => {
+  // The camera: framed on the whole board (its last step), so nothing moves while it plays. Excalidraw fits it; the
+  // finished board's elements are the target even when they are not all drawn yet. Never zoomed in past 1.2×.
+  const target = useMemo(() => convertToExcalidrawElements(boardSkeletons(frame) as never, { regenerateIds: false }), [frame])
+  const frameCamera = useRef<() => void>(() => undefined)
+  frameCamera.current = () => {
     if (!api || !size.width) return
-    const cam = boardCamera(boardBounds(frame), size)
-    api.updateScene({ appState: { zoom: { value: cam.zoom as never }, scrollX: cam.scrollX, scrollY: cam.scrollY } })
-  }, [api, frame, size])
+    const b = boardBounds(frame)
+    const fit = Math.min((size.width - 64) / b.w, (size.height - 64) / b.h)
+    api.scrollToContent(target, { fitToViewport: true, viewportZoomFactor: Math.max(0.1, Math.min(0.92, (0.92 * 1.2) / fit)), animate: false })
+  }
+  useEffect(() => {
+    frameCamera.current()
+  }, [api, target, size])
 
-  // The step: drawn at once, with what it added fading in.
+  // The step: drawn at once, with what it added fading in, then the camera put back on the whole board (Excalidraw
+  // moves it when the scene changes).
   useEffect(() => {
     if (!api) return
-    const draw = (fade: number) =>
+    const draw = (fade: number) => {
       api.updateScene({ elements: convertToExcalidrawElements(boardSkeletons(drawn, fade) as never, { regenerateIds: false }) })
+      frameCamera.current()
+    }
     if (!drawn.some((d) => d.fresh)) {
       draw(1)
       return

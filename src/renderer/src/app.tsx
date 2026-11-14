@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { lockedSections } from '../../shared/chat'
+import { boardsFromChat, lockedSections } from '../../shared/chat'
 import { AlertTriangle, X } from 'lucide-react'
 import { TitleBar } from '@/features/shell/title-bar'
 import { PanelTabs, type NarrowTab } from '@/features/shell/panel-tabs'
@@ -19,6 +19,7 @@ import { useWorkspace } from '@/features/workspace/use-workspace'
 import { Home } from '@/features/home/home'
 import { Onboarding } from '@/features/profile/onboarding'
 import { CodeViewContext } from '@/features/coach/code-view'
+import { BoardOpenContext } from '@/features/visualize/board-open'
 
 const SIDEBAR_KEY = 'bettercoder.sidebar-open'
 
@@ -35,6 +36,8 @@ export function App() {
   const [section, setSection] = useState<NarrowTab>('code')
   // What the coach pane has open (Chat, Tasks, Visualize, Map, Sources). Chat is the only chat.
   const [mode, setMode] = useState<CoachMode>('chat')
+  // The board Visualize shows: opened with Expand in the chat, or picked there (null: the newest).
+  const [board, setBoard] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   // The task they are asking the coach about, from the Tasks tab.
   const [about, setAbout] = useState<{ id: string; title: string } | null>(null)
@@ -66,6 +69,7 @@ export function App() {
     setAtHome(false)
     setAbout(null)
     setMode('chat')
+    setBoard(null)
     // A narrow window opens on the code; an idea with no folder on the coach.
     setSection(isIdea && !wide ? 'coach' : 'code')
     // Only when the session changes.
@@ -172,6 +176,8 @@ export function App() {
           items={coach.items}
           busy={coach.busy}
           onAsk={askFromMode}
+          board={board}
+          onPickBoard={setBoard}
           onAskTask={(task) => {
             // The task goes on the composer as a chip; they type their question in the chat.
             setAbout({ id: task.id, title: task.title })
@@ -184,11 +190,24 @@ export function App() {
     </CoachPane>
   )
 
+  // A new board: Visualize shows it (the newest) instead of one opened earlier.
+  const boardCount = useMemo(() => boardsFromChat(coach.items).length, [coach.items])
+  useEffect(() => {
+    setBoard(null)
+  }, [boardCount])
+
+  // Expand on a board in the chat: open it full size in Visualize.
+  const openBoard = (id: string) => {
+    setBoard(id)
+    setMode('visualize')
+  }
+
   // How step cards show real code: the learner's pick from onboarding or Settings, saved with their profile.
   const codeView = { view: settings?.profile.codeView }
 
   return (
     <CodeViewContext.Provider value={codeView}>
+    <BoardOpenContext.Provider value={openBoard}>
     <div className="flex h-full flex-col bg-background">
       <TitleBar
         project={project}
@@ -247,6 +266,7 @@ export function App() {
         }}
       />
     </div>
+    </BoardOpenContext.Provider>
     </CodeViewContext.Provider>
   )
 }

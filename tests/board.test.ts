@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { boardProblem, boardScene, type Board, type BoardStep } from '../src/shared/board'
-import { boardBounds, boardCamera, boardSkeletons } from '../src/renderer/src/features/visualize/board-elements'
+import { boardSkeletons } from '../src/renderer/src/features/visualize/board-elements'
 
 const step = (s: Partial<BoardStep> & { say: string }): BoardStep => ({ add: [], change: [], remove: [], focus: [], ...s })
 
@@ -59,14 +59,11 @@ test('board: removing a thing takes its arrows with it; an arrow at a whole row 
   assert.ok(!boardScene(board, 1).some((d) => d.kind === 'arrow'))
 })
 
-test('whiteboard look: new things fade in, arrows bind to shapes, the camera frames the whole board', () => {
+test('whiteboard look: new things fade in, arrows bind to shapes', () => {
   const drawn = boardScene(search, 1)
   const half = boardSkeletons(drawn, 0.5)
   assert.equal(half.find((e) => e.id === 'i')?.opacity, 50, 'added in this step: fading in')
   assert.equal(half.find((e) => e.id === 'nums.0')?.opacity, 100, 'from an earlier step: fully there')
   const arrow = half.find((e) => e.id === 'at')
   assert.deepEqual([arrow?.start, arrow?.end], [{ id: 'i' }, { id: 'nums.0' }])
-  // The camera is the same for every step (framed on the last), and a small board is not blown up past 1.2×.
-  const cam = boardCamera(boardBounds(boardScene(search, 3)), { width: 900, height: 460 })
-  assert.equal(cam.zoom, 1.2)
 })

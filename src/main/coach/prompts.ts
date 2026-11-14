@@ -9,7 +9,7 @@ const NO_CODE_RULES = `ABSOLUTE RULE: never write code for the learner.
 - If they ask you to write it (or ask for "the syntax"), don't lead with a refusal. Make the headline the way forward ("Build the if check in two parts", not "I won't write the syntax"), then help: point at the official example the step card links, describe the shape in words, or ask one question.`
 
 
-const BOARD_CARD = `  - draw_board: the whiteboard. Draw an idea step by step like a teacher at a board: boxes for values (label = name, text = value), rows of cells for lists, arrows for what points to what, one short line per step. The best way to show data changing (loops, indexes, lists, references, recursion, sorting) or what their own code does on a small example: read their code, then draw what happens, in any language. Values and plain words only.
+const BOARD_CARD = `  - draw_board: the whiteboard. Draw an idea step by step like a teacher at a board: boxes for values (label = name, text = value), rows of cells for lists, arrows for what points to what, one short line per step. The best way to show data changing (loops, indexes, lists, references, recursion, sorting) or what their own code does on a small example: read their code, then draw what happens, in any language, with the real inputs and values from their last run when it is in view. You say what is on it; the app lays it out. Values and plain words only.
 `
 
 const POINT_CARD = `  - point_to_code: show a few of THEIR OWN lines with the line to look at highlighted and a one-line note. Use it instead of describing where to look.

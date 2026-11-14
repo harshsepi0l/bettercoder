@@ -277,9 +277,6 @@ export function createVisualTools(
     text: Type.Optional(Type.String({ maxLength: BOARD_LIMITS.noteText, description: 'box or note: a value or a few plain words ("5", "\\"milk\\"", "empty")' })),
     label: Type.Optional(Type.String({ maxLength: BOARD_LIMITS.boxText, description: 'box or cells: its name, shown above it ("total"); arrow: a word on it' })),
     items: Type.Optional(Type.Array(Type.String({ maxLength: BOARD_LIMITS.boxText }), { maxItems: BOARD_LIMITS.cells, description: 'cells: one value per cell' })),
-    col: Type.Optional(Type.Integer({ minimum: 0, maximum: BOARD_LIMITS.cols - 1, description: 'Grid column, 0 on the left (a box is one column wide; a cell is a third of one)' })),
-    row: Type.Optional(Type.Integer({ minimum: 0, maximum: BOARD_LIMITS.rows - 1, description: 'Grid row, 0 at the top' })),
-    width: Type.Optional(Type.Integer({ minimum: 1, maximum: 4, description: 'box: columns wide (default 1)' })),
     shape: Type.Optional(Type.Union([Type.Literal('box'), Type.Literal('circle'), Type.Literal('diamond')])),
     indexes: Type.Optional(Type.Boolean({ description: 'cells: show 0, 1, 2… under them (default true)' })),
     from: Type.Optional(Type.String({ description: 'arrow: id it starts at' })),
@@ -310,7 +307,7 @@ export function createVisualTools(
     name: 'draw_board',
     label: 'Whiteboard',
     description:
-      'Draw on a whiteboard, step by step, like a teacher: boxes for values (label = the name, text = the value), rows of cells for lists, notes, and arrows for what points to what. Each step adds, changes, removes or lights up things and says what happened in one line; the learner plays it or steps through. Lay things out on a 10×10 grid (col, row), leaving room between them. Use it to show how data changes (loops, indexes, lists, references, recursion, sorting) or how parts of their program connect. Values and plain words only, never code.',
+      'Draw on a whiteboard, step by step, like a teacher: boxes for values (label = the name, text = the value), rows of cells for lists, notes, and arrows for what points to what. Each step adds, changes, removes or lights up things and says what happened in one line; the learner plays it or steps through. You say what is on the board, the app places it: boxes flow in rows in the order you add them, each row of cells gets its own line, notes go at the bottom. Add things in the order they should read. When their last run is in view, use its real inputs and values, and light up where it goes wrong. Use it to show how data changes (loops, indexes, lists, references, recursion, sorting) or how parts of their program connect. Values and plain words only, never code.',
     parameters: BoardParams,
     execute: async (_id, p) => {
       const board: Board = {
@@ -335,25 +332,21 @@ export function createVisualTools(
 
 /** One item from the tool's flat shape, checked for what its type needs. */
 function boardItem(
-  it: { type: BoardItem['type']; id: string; text?: string; label?: string; items?: string[]; col?: number; row?: number; width?: number; shape?: 'box' | 'circle' | 'diamond'; indexes?: boolean; from?: string; to?: string },
+  it: { type: BoardItem['type']; id: string; text?: string; label?: string; items?: string[]; shape?: 'box' | 'circle' | 'diamond'; indexes?: boolean; from?: string; to?: string },
   n: number
 ): BoardItem {
   const at = `Step ${n + 1}, "${it.id}"`
-  const place = () => {
-    if (it.col === undefined || it.row === undefined) throw new Error(`${at}: give it a col and a row.`)
-    return { col: it.col, row: it.row }
-  }
   switch (it.type) {
     case 'box':
       if (!it.text) throw new Error(`${at}: a box needs text.`)
       if (it.text.length > BOARD_LIMITS.boxText) throw new Error(`${at}: keep a box to ${BOARD_LIMITS.boxText} characters; use a note for more.`)
-      return { type: 'box', id: it.id, text: it.text, ...place(), ...(it.label ? { label: it.label } : {}), ...(it.width ? { width: it.width } : {}), ...(it.shape ? { shape: it.shape } : {}) }
+      return { type: 'box', id: it.id, text: it.text, ...(it.label ? { label: it.label } : {}), ...(it.shape ? { shape: it.shape } : {}) }
     case 'cells':
       if (!it.items?.length) throw new Error(`${at}: a row of cells needs items.`)
-      return { type: 'cells', id: it.id, items: it.items, ...place(), ...(it.label ? { label: it.label } : {}), ...(it.indexes === false ? { indexes: false } : {}) }
+      return { type: 'cells', id: it.id, items: it.items, ...(it.label ? { label: it.label } : {}), ...(it.indexes === false ? { indexes: false } : {}) }
     case 'note':
       if (!it.text) throw new Error(`${at}: a note needs text.`)
-      return { type: 'note', id: it.id, text: it.text, ...place() }
+      return { type: 'note', id: it.id, text: it.text }
     case 'arrow':
       if (!it.from || !it.to) throw new Error(`${at}: an arrow needs from and to.`)
       return { type: 'arrow', id: it.id, from: it.from, to: it.to, ...(it.label ? { label: it.label } : {}) }

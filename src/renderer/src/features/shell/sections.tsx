@@ -14,7 +14,9 @@ export function ModePanel({
   items,
   busy,
   onAsk,
-  onAskTask
+  onAskTask,
+  board,
+  onPickBoard
 }: {
   mode: CoachMode
   project: ProjectInfo | null
@@ -24,6 +26,9 @@ export function ModePanel({
   onAsk: (text: string, intent?: CoachIntent) => void
   /** Ask the coach about one task in their own words (the composer takes it). */
   onAskTask: (task: TaskView) => void
+  /** The board Visualize shows (a chat item id; null: the newest). */
+  board: string | null
+  onPickBoard: (id: string) => void
 }) {
   switch (mode) {
     case 'chat':
@@ -31,7 +36,7 @@ export function ModePanel({
     case 'tasks':
       return <TasksTab busy={busy} onSend={onAsk} onAsk={onAskTask} />
     case 'visualize':
-      return <VisualizeTab items={items} busy={busy} onAsk={onAsk} />
+      return <VisualizeTab items={items} busy={busy} onAsk={onAsk} picked={board} onPick={onPickBoard} />
     case 'map':
       return <MapTab project={project} onAsk={onAsk} />
     case 'sources':

@@ -44,16 +44,6 @@ export function boardBounds(drawn: readonly Drawn[]): { x: number; y: number; w:
   return Number.isFinite(x0) ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : { x: 0, y: 0, w: 1, h: 1 }
 }
 
-/** The camera that fits the board in a viewport (never zoomed in past 1.2×). */
-export function boardCamera(bounds: { x: number; y: number; w: number; h: number }, view: { width: number; height: number }) {
-  const pad = 32
-  const zoom = Math.max(0.2, Math.min(1.2, (view.width - pad * 2) / bounds.w, (view.height - pad * 2) / bounds.h))
-  return {
-    zoom,
-    scrollX: view.width / (2 * zoom) - (bounds.x + bounds.w / 2),
-    scrollY: view.height / (2 * zoom) - (bounds.y + bounds.h / 2)
-  }
-}
 
 /**
  * Excalidraw skeletons for a board step. `fade` (0 to 1) is how far the things added in this step have appeared.

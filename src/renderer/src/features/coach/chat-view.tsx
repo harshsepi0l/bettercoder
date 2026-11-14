@@ -41,7 +41,7 @@ export function ChatView({
       const a = answers.get(item.id)
       return (
         <CardBoundary key={`card-${item.id}`}>
-          <CardView card={item.card} answer={a?.answer} active={!!a?.open && !busy} latest={item.id === latestPseudo} onAnswer={onAnswer} typed={item.id === typed?.id ? typed.n : undefined} />
+          <CardView id={item.id} card={item.card} answer={a?.answer} active={!!a?.open && !busy} latest={item.id === latestPseudo} onAnswer={onAnswer} typed={item.id === typed?.id ? typed.n : undefined} />
         </CardBoundary>
       )
     }

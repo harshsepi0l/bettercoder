@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, Clapperboard, ExternalLink, PenLine, FileCode2, Lightbulb, ListOrdered, ScrollText, Workflow } from 'lucide-react'
 import { BoardPlayer } from '@/features/visualize/board-player'
+import { useBoardOpen } from '@/features/visualize/board-open'
 import { QuestionBody } from './question-body'
 import { StepCard } from './step-card'
 import { DocExampleView } from '@/features/sources/doc-example'
@@ -12,6 +13,7 @@ const SHELL = 'flex flex-col gap-3 rounded-lg border bg-card p-3.5'
 const LABEL = 'flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground'
 
 export function CardView({
+  id,
   card,
   answer,
   active,
@@ -19,6 +21,8 @@ export function CardView({
   onAnswer,
   typed
 }: {
+  /** The chat item it is in (for Expand on a board). */
+  id?: string
   card: Card
   /** For questions: what the learner answered, if they did. */
   answer?: string
@@ -46,13 +50,14 @@ export function CardView({
     case 'step':
       return <StepCard card={card} answer={answer} active={!!active} onAnswer={onAnswer} typed={typed} />
     case 'board':
-      return <BoardCard card={card} />
+      return <BoardCard id={id} card={card} />
     case 'animation':
       return <OldAnimation card={card} />
   }
 }
 
-function BoardCard({ card }: { card: Extract<Card, { kind: 'board' }> }) {
+function BoardCard({ id, card }: { id?: string; card: Extract<Card, { kind: 'board' }> }) {
+  const open = useBoardOpen()
   return (
     <div className={SHELL}>
       <div className={LABEL}>
@@ -63,7 +68,7 @@ function BoardCard({ card }: { card: Extract<Card, { kind: 'board' }> }) {
         <Lightbulb className="mt-0.5 size-3.5 shrink-0 text-brand-text" aria-hidden="true" />
         {card.note}
       </p>
-      <BoardPlayer board={card.board} compact />
+      <BoardPlayer board={card.board} compact onExpand={open && id ? () => open(id) : undefined} />
     </div>
   )
 }

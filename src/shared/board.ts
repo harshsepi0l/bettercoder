@@ -1,6 +1,7 @@
 /**
- * The whiteboard: the coach draws an idea in steps (boxes, rows of cells, notes, arrows) on a small grid; the app lays
- * it out and Excalidraw draws it. Pure data and rules, shared by the coach's tool (validation) and the window (layout).
+ * The whiteboard: the coach draws an idea in steps (boxes, rows of cells, notes, arrows) and says only what is on it;
+ * the app decides where everything goes (layoutBoard) and Excalidraw draws it. Boards from before 2026-11-13 carry
+ * grid positions (col, row) the coach picked; they are ignored, so old boards get the same tidy layout. Pure data and rules, shared by the coach's tool (validation) and the window (layout).
  * Every word on it goes through the no-code check before it is shown (coach/tools/cards.ts).
  */
 
@@ -8,11 +9,11 @@ export type BoxShape = 'box' | 'circle' | 'diamond'
 
 export type BoardItem =
   /** A box with a value or a few words; `label` is its name above it (a variable: label "total", text "5"). */
-  | { type: 'box'; id: string; text: string; col: number; row: number; label?: string; width?: number; shape?: BoxShape }
+  | { type: 'box'; id: string; text: string; col?: number; row?: number; label?: string; width?: number; shape?: BoxShape }
   /** A row of cells (a list, a queue, a string's letters); each cell is `<id>.<index>` for arrows and changes. */
-  | { type: 'cells'; id: string; items: string[]; col: number; row: number; label?: string; indexes?: boolean }
+  | { type: 'cells'; id: string; items: string[]; col?: number; row?: number; label?: string; indexes?: boolean }
   /** Words on the board, no border. */
-  | { type: 'note'; id: string; text: string; col: number; row: number }
+  | { type: 'note'; id: string; text: string; col?: number; row?: number }
   /** From one thing to another (a box, a row, one cell, a note). */
   | { type: 'arrow'; id: string; from: string; to: string; label?: string }
 
@@ -101,7 +102,8 @@ function apply(state: State, step: BoardStep, n: number): void {
     if (it.type === 'arrow') {
       for (const end of [it.from, it.to]) if (!exists(state, end)) throw new Error(`${at}: the arrow "${it.id}" points at "${end}", which is not on the board yet.`)
     } else {
-      if (it.col < 0 || it.col >= BOARD_LIMITS.cols || it.row < 0 || it.row >= BOARD_LIMITS.rows) {
+      const off = (v: number | undefined, max: number) => v !== undefined && (v < 0 || v >= max)
+      if (off(it.col, BOARD_LIMITS.cols) || off(it.row, BOARD_LIMITS.rows)) {
         throw new Error(`${at}: "${it.id}" is off the board (col and row go from 0 to ${BOARD_LIMITS.cols - 1}).`)
       }
       if (it.type === 'cells' && (it.items.length === 0 || it.items.length > BOARD_LIMITS.cells)) throw new Error(`${at}: a row has 1 to ${BOARD_LIMITS.cells} cells.`)
@@ -155,9 +157,84 @@ export type Drawn =
   | { kind: 'text'; id: string; x: number; y: number; text: string; size: 'name' | 'note' | 'index'; lit: boolean; fresh: boolean }
   | { kind: 'arrow'; id: string; from: string; to: string; label?: string; lit: boolean; fresh: boolean }
 
+/** Boxes per line before the next one starts a new line (in grid columns, COL wide each). */
+const FLOW_UNITS = 3
+/** A note wraps at this many characters, so it never runs into what is beside it. */
+const NOTE_CHARS = 36
+
+type Placed = Extract<BoardItem, { type: 'box' | 'cells' | 'note' }>
+
+/** A box's width in grid columns: wide enough for the longest text it ever shows (a change can lengthen it). */
+function boxUnits(it: Extract<BoardItem, { type: 'box' }>, texts: string[]): number {
+  if (it.width) return Math.max(1, Math.min(4, it.width))
+  const chars = Math.max(...texts.map((t) => t.length), (it.label ?? '').length)
+  return Math.max(1, Math.min(FLOW_UNITS, Math.ceil((chars * 10 + 40) / COL)))
+}
+
+/** Plain words broken into lines of at most `max` characters. */
+export function wrapWords(text: string, max: number): string {
+  const lines: string[] = []
+  let line = ''
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    if (line && line.length + 1 + word.length > max) {
+      lines.push(line)
+      line = word
+    } else line = line ? `${line} ${word}` : word
+  }
+  if (line) lines.push(line)
+  return lines.join('\n')
+}
+
+/**
+ * Where everything goes, decided once for the whole board, so nothing moves while it plays: every box, row and note
+ * by the order it first appears. Boxes (values) flow left to right, a few per line; each row of cells gets a line of
+ * its own; notes go at the bottom, one per line, wrapped. A slot stays taken after its thing is removed.
+ */
+export function layoutBoard(board: Board): Map<string, { x: number; y: number; units: number }> {
+  const order: Placed[] = []
+  const texts = new Map<string, string[]>()
+  for (const s of board.steps) {
+    for (const it of s.add) {
+      if (it.type === 'arrow') continue
+      if (!texts.has(it.id)) {
+        order.push(it)
+        texts.set(it.id, [])
+      }
+      if (it.type !== 'cells') texts.get(it.id)!.push(it.text)
+    }
+    for (const c of s.change) if (c.text !== undefined) texts.get(c.id)?.push(c.text)
+  }
+  const out = new Map<string, { x: number; y: number; units: number }>()
+  let row = 0
+  let col = 0
+  const notes: Placed[] = []
+  for (const it of order) {
+    if (it.type === 'note') {
+      notes.push(it)
+    } else if (it.type === 'cells') {
+      if (col > 0) row++
+      out.set(it.id, { x: 0, y: row * ROW, units: 1 })
+      row++
+      col = 0
+    } else {
+      const units = boxUnits(it, texts.get(it.id) ?? [it.text])
+      if (col > 0 && col + units > FLOW_UNITS) {
+        row++
+        col = 0
+      }
+      out.set(it.id, { x: col * COL, y: row * ROW, units })
+      col += units
+    }
+  }
+  if (col > 0) row++
+  for (const n of notes) out.set(n.id, { x: 0, y: row++ * ROW, units: 1 })
+  return out
+}
+
 /** The board as it stands after step `at` (0-based), laid out. Assumes a valid board (boardProblem is null). */
 export function boardScene(board: Board, at: number): Drawn[] {
   const state: State = { items: new Map() }
+  const place = layoutBoard(board)
   const last = Math.max(0, Math.min(at, board.steps.length - 1))
   for (let n = 0; n <= last; n++) apply(state, board.steps[n], n)
   const step = board.steps[last]
@@ -169,16 +246,18 @@ export function boardScene(board: Board, at: number): Drawn[] {
   const out: Drawn[] = []
   for (const it of state.items.values()) {
     if (it.type === 'arrow') continue
-    const x = it.col * COL
-    const y = it.row * ROW + LABEL_GAP
+    const at = place.get(it.id) ?? { x: 0, y: 0, units: 1 }
+    const x = at.x
+    const y = at.y + LABEL_GAP
     if (it.type === 'note') {
-      out.push({ kind: 'text', id: it.id, x, y: y + 16, text: it.text, size: 'note', lit: isLit(it.id), fresh: isFresh(it.id) })
+      const text = wrapWords(it.text, NOTE_CHARS)
+      out.push({ kind: 'text', id: it.id, x, y: y + 16, text, size: 'note', lit: isLit(it.id), fresh: isFresh(it.id) })
       continue
     }
     if (it.label) out.push({ kind: 'text', id: `${it.id}~label`, x, y: y - LABEL_GAP, text: it.label, size: 'name', lit: isLit(it.id), fresh: isFresh(it.id) })
     if (it.type === 'box') {
       const kind = it.shape === 'circle' ? 'ellipse' : it.shape === 'diamond' ? 'diamond' : 'rect'
-      const w = Math.max(1, Math.min(4, it.width ?? 1)) * COL - 30
+      const w = at.units * COL - 30
       out.push({ kind, id: it.id, x, y, w, h: BOX_H, text: it.text, lit: isLit(it.id), fresh: isFresh(it.id) })
     } else {
       it.items.forEach((v, i) => {

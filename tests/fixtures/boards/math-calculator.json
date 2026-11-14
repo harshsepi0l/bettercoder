@@ -1,0 +1,160 @@
+{
+ "steps": [
+  {
+   "say": "Program starts; number and success are not filled yet.",
+   "add": [
+    {
+     "type": "box",
+     "id": "number",
+     "label": "number",
+     "text": "?",
+     "col": 1,
+     "row": 1
+    },
+    {
+     "type": "box",
+     "id": "success",
+     "label": "success",
+     "text": "?",
+     "col": 3,
+     "row": 1
+    },
+    {
+     "type": "box",
+     "id": "sec",
+     "label": "SecNumber",
+     "text": "?",
+     "col": 5,
+     "row": 1
+    },
+    {
+     "type": "box",
+     "id": "w",
+     "label": "w (op)",
+     "text": "?",
+     "col": 7,
+     "row": 1
+    }
+   ],
+   "change": [],
+   "remove": [],
+   "focus": []
+  },
+  {
+   "say": "You type 23; TryParse fills number and marks success true.",
+   "add": [],
+   "change": [
+    {
+     "id": "number",
+     "text": "23"
+    },
+    {
+     "id": "success",
+     "text": "true"
+    }
+   ],
+   "remove": [],
+   "focus": []
+  },
+  {
+   "say": "You type 20; Parse fills SecNumber.",
+   "add": [],
+   "change": [
+    {
+     "id": "sec",
+     "text": "20"
+    }
+   ],
+   "remove": [],
+   "focus": []
+  },
+  {
+   "say": "You type *; that is stored in w.",
+   "add": [],
+   "change": [
+    {
+     "id": "w",
+     "text": "*"
+    }
+   ],
+   "remove": [],
+   "focus": []
+  },
+  {
+   "say": "Checks + and - fail; * matches.",
+   "add": [
+    {
+     "type": "box",
+     "id": "branch",
+     "label": "branch",
+     "text": "multiply",
+     "col": 4,
+     "row": 3,
+     "shape": "diamond"
+    }
+   ],
+   "change": [],
+   "remove": [],
+   "focus": [
+    "w",
+    "branch"
+   ]
+  },
+  {
+   "say": "result becomes 23 times 20.",
+   "add": [
+    {
+     "type": "box",
+     "id": "result",
+     "label": "result",
+     "text": "460",
+     "col": 4,
+     "row": 5
+    },
+    {
+     "type": "arrow",
+     "id": "a1",
+     "from": "number",
+     "to": "result",
+     "label": "×"
+    },
+    {
+     "type": "arrow",
+     "id": "a2",
+     "from": "sec",
+     "to": "result"
+    }
+   ],
+   "change": [],
+   "remove": [],
+   "focus": [
+    "result"
+   ]
+  },
+  {
+   "say": "Prints 460. success was never checked.",
+   "add": [
+    {
+     "type": "note",
+     "id": "out",
+     "text": "screen shows 460",
+     "col": 4,
+     "row": 7
+    },
+    {
+     "type": "note",
+     "id": "gap",
+     "text": "success true/false is ignored for now",
+     "col": 1,
+     "row": 3
+    }
+   ],
+   "change": [],
+   "remove": [],
+   "focus": [
+    "out",
+    "success"
+   ]
+  }
+ ]
+}
