@@ -64,7 +64,7 @@ export function registerHarness(getWindow: () => BrowserWindow | null): { flush(
   const context: IpcContext = { getWindow, ready, workspace, ide }
   registerCoachIpc(context)
   registerWorkspaceIpc(context)
-  registerTasksIpc(context)
+  registerTasksIpc(context, () => codeBox.code ?? null)
   registerEditorIpc(context)
   codeBox.code = registerRuns(context, bridge)
   const map = registerMapIpc(context)

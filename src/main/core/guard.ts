@@ -28,6 +28,18 @@ const CODE_START =
 
 const INDENTED = /^(?: {4}|\t)/
 
+/** Small words of ordinary sentences: code never has them after a keyword ("using the result" is English). */
+const SENTENCE_WORDS = /\s(?:the|a|an|to|of|it|its|that|this|your|their|is|are|was|when|so|and|or|with|into|from|every|each|until|then|before|after|never|not|no|only|still|also|just)\b|\w's\b|[—–]/
+
+/**
+ * A line that starts with a code keyword but reads as a sentence: "using the TryParse result", "return the total to
+ * the caller", "using TryParse's flag", "return leaves — the rest never runs". No code symbols, at least three words, and
+ * something only sentences have (a small word like "the", a possessive, a dash).
+ */
+function keywordProse(t: string): boolean {
+  return /^[a-z]+\s/.test(t) && !/[;{}()=<>[\]"`+*/%]|\s-\s|'(?!s\b)/.test(t) && t.split(/\s+/).length >= 3 && SENTENCE_WORDS.test(t)
+}
+
 /** Inline code that only names something is fine: an identifier, a file path, a short command. */
 const SAFE_INLINE = /^[A-Za-z0-9_.\/\\:@#+\- ]{1,60}$/
 
@@ -50,7 +62,7 @@ export function looksLikeCodeStart(prefix: string): boolean {
 export function isCodeLine(line: string): boolean {
   const t = stripListMarker(line).trim()
   if (t.length === 0) return false
-  if (CODE_START.test(t)) return true
+  if (CODE_START.test(t)) return !keywordProse(t)
   if (/^[{}()[\];]+;?$/.test(t)) return true
   if (/[;{]\s*$/.test(t) && /[(=]/.test(t)) return true
   if (/\)\s*:\s*$/.test(t) && /\(/.test(t)) return true // def foo(x):

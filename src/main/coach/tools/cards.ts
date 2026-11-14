@@ -7,6 +7,7 @@ import { redactSecrets } from '../../core/paths'
 import { viewLines } from '../../core/text-view'
 import type { ProjectFiles } from '../../ports'
 import { BOARD_LIMITS, boardProblem, boardTexts, type Board, type BoardItem } from '../../../shared/board'
+import { MAX_CHECKS, MAX_EXPECTS, MAX_INPUTS, cleanChecks } from '../../../shared/step-checks'
 
 /**
  * Tools that draw cards in the chat. They keep the coach visual and short:
@@ -66,6 +67,12 @@ export function cardProblem(card: Card): string | null {
         texts.push(...(l.parts ?? []).map((x) => x.says))
       }
       if (card.question) texts.push(card.question.question, ...card.question.options)
+      // What Check types in, and the words it looks for: values and plain words, never code.
+      for (const c of card.checks ?? []) {
+        for (const t of [...c.inputs, ...c.expect.flatMap((e) => (e.kind === 'prints' || e.kind === 'not_prints' ? [e.text] : []))]) {
+          if (t && !isDataLiteral(t) && (isCodeLine(t) || codeInText(t))) return `A check looks like code: "${t}". Use values and plain words.`
+        }
+      }
       break
     case 'board':
       texts.push(card.title, card.note)
@@ -75,7 +82,8 @@ export function cardProblem(card: Card): string | null {
       texts.push(card.title, card.note)
       break
   }
-  for (const t of texts) if (t && codeInText(t)) return 'That card contained code. Say it in plain words instead.'
+  // Name the words, so the coach can fix them in one go instead of guessing.
+  for (const t of texts) if (t && codeInText(t)) return `That card contained code: "${t.slice(0, 80)}". Say it in plain words instead.`
   return null
 }
 
@@ -215,7 +223,31 @@ export function createVisualTools(
         },
         { description: "Where in THEIR file this step is written. Their editor labels that line with the step's title and offers the official line for each tagged line. Use it whenever you know the place." }
       )
-    )
+    ),
+    checks: Type.Optional(
+      Type.Array(
+        Type.Object({
+          inputs: Type.Array(Type.String({ maxLength: 60 }), { maxItems: MAX_INPUTS, description: 'What to type, one line each, in order ("abc", or "7", "3", "+"). Empty when it asks for nothing.' }),
+          expect: Type.Array(
+            Type.Object({
+              kind: Type.Union([Type.Literal('no_crash'), Type.Literal('prints_number'), Type.Literal('prints'), Type.Literal('not_prints')], {
+                description: 'no_crash: ends normally. prints_number: prints this number (value). prints: shows these words (text). not_prints: never shows these words (text), e.g. a prompt it should skip.'
+              }),
+              value: Type.Optional(Type.Number({ description: 'prints_number: the number' })),
+              text: Type.Optional(Type.String({ maxLength: 80, description: 'prints / not_prints: words their code already prints, or words this step tells them to print' }))
+            }),
+            { minItems: 1, maxItems: MAX_EXPECTS }
+          )
+        }),
+        {
+          maxItems: MAX_CHECKS,
+          description:
+            "How the learner's Check button tests this step: the app runs THEIR file once per check, types the inputs in, and grades what happens itself. Give 1-3 checks whenever a run can show the step works (the normal case and the bad case). Work numbers out carefully; pick inputs whose answer differs from every input. Only words their code already prints, or that this step tells them to print."
+        }
+      )
+    ),
+    task_id: Type.Optional(Type.String({ maxLength: 8, description: 'The task this step belongs to ("t2"), when it is one of that task\'s steps' })),
+    step_number: Type.Optional(Type.Integer({ minimum: 1, maximum: 6, description: "Which of that task's steps it is, from 1" }))
   })
   const https = (u: string | undefined) => (u && /^https:\/\/[^\s]+$/.test(u) ? u : undefined)
   const step: AgentTool<typeof StepParams> = {
@@ -253,6 +285,9 @@ export function createVisualTools(
             ...(p.idea.level ? { level: p.idea.level } : {})
           }
         : undefined
+      // An idea has no file to run, so no checks.
+      const checks = root ? cleanChecks(p.checks) : []
+      if (p.checks?.length && root && checks.length < p.checks.length) throw new Error('Each check needs at least one expect: no_crash, prints_number with value, or prints / not_prints with text.')
       // Only a real file of theirs: the same sandbox as reading. An idea has no folder, so no place.
       const anchor = root && p.at ? { path: (await ports.files.resolve(root, p.at.path, allowed)).rel, line: p.at.line } : undefined
       const card: Card = {
@@ -261,7 +296,9 @@ export function createVisualTools(
         ...(idea ? { idea } : {}),
         lines,
         ...(anchor ? { anchor } : {}),
-        ...(p.question ? { question: { question: p.question.question, options: p.question.options, allowOther: true } } : {})
+        ...(p.question ? { question: { question: p.question.question, options: p.question.options, allowOther: true } } : {}),
+        ...(checks.length ? { checks } : {}),
+        ...(p.task_id && p.step_number ? { of: { taskId: p.task_id.trim(), step: p.step_number } } : {})
       }
       check(card)
       // A card ends the reply (a round of only cards ends the turn): another round would only repeat the headline.

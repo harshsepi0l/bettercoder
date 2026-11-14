@@ -116,3 +116,21 @@ test('guard: printed values are data, not code (regression: a hidden example pri
   for (const code of ['x = [1, 2]', 'print(a)', 'nums[i]', 'f(1, 2)', 'a + b', 'def f():', '1 2'])
     assert.equal(isDataLiteral(code), false, code)
 })
+
+/**
+ * Regression (real session check, 2026-11-14): a step card's idea "using the TryParse result" was taken for a C#
+ * using line, and the card was refused 6 times with no hint of why (88k tokens for one reply). A keyword line that
+ * reads as a sentence is prose; code after a keyword is still code; and a refusal names the words.
+ */
+test('a sentence that starts with a code keyword is prose; code that starts with one is still code', async () => {
+  const { isCodeLine } = await import('../src/main/core/guard')
+  for (const prose of ['using the TryParse result', 'return the total to the caller', 'import the data from a file', 'let the user type a number', "using TryParse's success flag", 'return leaves — second-number prompt never runs']) {
+    assert.equal(isCodeLine(prose), false, prose)
+  }
+  for (const code of ['using System;', 'using System.Text', 'public class Foo', 'static void Main', 'return total;', 'import os', 'const x = 5', 'let the = 3', "using 'System'", 'return a + b']) {
+    assert.equal(isCodeLine(code), true, code)
+  }
+  const { cardProblem } = await import('../src/main/coach/tools/cards')
+  assert.equal(cardProblem({ kind: 'step', title: 'Act on it', idea: { term: 'using the TryParse result', explanation: 'It says whether it worked.' }, lines: [] }), null)
+  assert.match(cardProblem({ kind: 'step', title: 'x = int(input())', lines: [] }) ?? '', /"x = int\(input\(\)\)"/)
+})

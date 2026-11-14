@@ -56,6 +56,13 @@ export class IdeHub {
     this.changed()
   }
 
+  /** The file open in the editor, relative to the project (only one of theirs), or null. */
+  editorFile(): string | null {
+    if (!this.project) return null
+    const snap = this.bridge.snapshot()
+    return snap ? visiblePath(this.project.root, this.project.files, snap.file) : null
+  }
+
   /** The learner's last ▶ Run in this session, for Check my answer. */
   lastRunNow(): RunSummary | null {
     return this.lastRun

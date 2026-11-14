@@ -103,6 +103,8 @@ export type ToIde =
   | { type: 'status'; text: string; tooltip: string }
   /** A run started from the editor: its output, its end (with the plain-words line), or why it could not start. */
   | { type: 'term'; event: TerminalEvent }
+  /** A step's Check started a run of `file` (absolute): show it in the "▶ Check" terminal; its output follows as term events. */
+  | { type: 'check_run'; file: string; runId: string; label: string }
   | { type: 'run_error'; file: string; message: string; install?: { name: string; url: string } }
   /** "Open in editor" (from the Map or a step card): show this file at this line (absolute; a notebook's line is in the coach's view). */
   | { type: 'open'; file: string; line: number | null }

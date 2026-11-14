@@ -48,3 +48,18 @@ export function useTasks(): { update: TasksUpdate; notices: ShownNotice[]; dismi
 
   return { update, notices, dismiss }
 }
+
+/** The open session's tasks and step Checks only (no notifications), for cards in the chat. */
+export function useTasksUpdate(): TasksUpdate {
+  const [update, setUpdate] = useState<TasksUpdate>({ sessionId: null, tasks: [] })
+  useEffect(() => {
+    let live = true
+    void window.tasks.list().then((u) => live && setUpdate(u))
+    const off = window.tasks.onChanged(setUpdate)
+    return () => {
+      live = false
+      off()
+    }
+  }, [])
+  return update
+}

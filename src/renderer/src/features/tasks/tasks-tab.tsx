@@ -67,6 +67,11 @@ export function TasksTab({ busy, onSend, onAsk }: { busy: boolean; onSend: Send;
                       <StatusIcon task={t} current={open} />
                       <span className={cn('min-w-0 flex-1 truncate text-[13.5px]', t.status === 'done' ? 'text-muted-foreground' : 'font-semibold text-heading')}>{t.title}</span>
                     </button>
+                    {t.steps.length > 0 && (
+                      <span className="shrink-0 font-mono text-[10.5px] text-muted-foreground">
+                        {t.steps.filter((x) => x.passed).length}/{t.steps.length}
+                      </span>
+                    )}
                     <ByTag by={t.by} />
                     <Button
                       variant="ghost"
@@ -139,6 +144,30 @@ function TaskBody({ task, busy, onSend, onAsk }: { task: TaskView; busy: boolean
               <Button size="sm" variant="outline" className="h-7" onClick={() => onSend('Write how to check my waiting tasks.', 'task')}>
                 <Pencil />
                 Ask the coach to write it
+              </Button>
+            )}
+            {ask}
+          </div>
+        </>
+      ) : task.steps.length > 0 ? (
+        <>
+          {/* Checked step by step: each step card in the chat has its own Check. */}
+          <ol className="flex flex-col gap-1">
+            {task.steps.map((s, i) => (
+              <li key={i} className="flex items-center gap-2 text-[12.5px]">
+                {s.passed ? <CircleCheck className="size-3.5 shrink-0 text-status-done" aria-label="Passed" /> : <Circle className="size-3.5 shrink-0 text-muted-foreground" aria-label="Not yet" />}
+                <span className={s.passed ? 'text-muted-foreground' : 'text-foreground'}>
+                  {i + 1}. {s.title}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <p className="text-[11.5px] text-muted-foreground">Each step is checked by running your file: press Check on its step in the chat.</p>
+          <div className="flex flex-wrap gap-2 pt-0.5">
+            {task.status !== 'done' && (
+              <Button size="sm" className="h-7" disabled={busy} onClick={() => onSend(`Teach me the next step of “${task.title}”.`, 'next')}>
+                <Check />
+                Next step
               </Button>
             )}
             {ask}

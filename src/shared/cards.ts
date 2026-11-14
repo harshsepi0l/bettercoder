@@ -1,4 +1,5 @@
 import type { Board } from './board'
+import type { RunCheck, StepOfTask } from './step-checks'
 import type { SkillLevel } from './profile'
 import type { LinePart } from './line-parts'
 
@@ -55,6 +56,10 @@ export type Card =
       question?: { question: string; options: string[]; allowOther: boolean }
       /** Where in their file to write it (relative path, 1-based line): their editor labels it, with the official line of each tagged line. */
       anchor?: { path: string; line: number }
+      /** How Check tests this step: runs of their file with inputs typed in, graded by the app (shared/step-checks.ts). */
+      checks?: RunCheck[]
+      /** Which step of which task this is (its pass marks that step passed). */
+      of?: StepOfTask
     }
   /** The whiteboard: the coach draws an idea in steps; the learner plays or steps through it. */
   | { kind: 'board'; title: string; note: string; board: Board }

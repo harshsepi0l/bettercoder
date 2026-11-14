@@ -3,7 +3,7 @@ import type { ProjectInfo } from '../../shared/ipc'
 import type { CodeMap } from '../../shared/map'
 import type { IdeDiagnostic, ToIde } from '../../shared/ide'
 import type { ProjectSummary, SessionSummary } from '../../shared/workspace'
-import type { TaskBy, TaskCheck, TaskStatus } from '../../shared/tasks'
+import type { TaskBy, TaskCheck, TaskStatus, TaskStep } from '../../shared/tasks'
 
 /**
  * Ports: what the coach and the services need from the outside world, as interfaces only. Adapters and engines
@@ -71,6 +71,8 @@ export interface StoredTask {
   status: TaskStatus
   check: TaskCheck | null
   createdAt: number
+  /** The plan, step by step (tasks from before steps have none). */
+  steps?: TaskStep[]
 }
 
 export interface SessionStore {

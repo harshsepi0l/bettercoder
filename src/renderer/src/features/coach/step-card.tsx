@@ -8,6 +8,7 @@ import { DocExampleView, docHost, useDocExample } from '@/features/sources/doc-e
 import { cn } from '@/lib/utils'
 import { useCodeView } from './code-view'
 import { QuestionBody } from './question-body'
+import { StepChecks } from './step-checks'
 
 type StepCardData = Extract<Card, { kind: 'step' }>
 
@@ -58,6 +59,8 @@ export function StepCard({
       {card.idea && <Idea idea={card.idea} showExample={!hasLinks} />}
 
       {card.lines.length > 0 && (shown === 'stepper' ? <Stepper lines={card.lines} typed={typed} /> : <Highlight lines={card.lines} typed={typed} />)}
+
+      <StepChecks card={card} onNext={onAnswer} />
 
       {card.question && (
         <div className="border-t pt-3">

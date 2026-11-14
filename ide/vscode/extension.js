@@ -245,6 +245,8 @@ function receive(m) {
     status.tooltip = typeof m.tooltip === 'string' ? m.tooltip.slice(0, 200) : ''
   } else if (m.type === 'term' && m.event && typeof m.event === 'object') {
     onTerm(m.event)
+  } else if (m.type === 'check_run' && typeof m.runId === 'string' && typeof m.file === 'string') {
+    showCheckRun(m)
   } else if (m.type === 'run_error' && typeof m.message === 'string') {
     const install = m.install && typeof m.install.url === 'string' && /^https:\/\//.test(m.install.url) ? m.install : null
     if (runTerm && !runTerm.id && !runTerm.done) finishRun(runTerm, `${RED}${m.message}${RESET}${install ? `\r\n${DIM}Get it: ${install.url}${RESET}` : ''}`)
@@ -460,6 +462,36 @@ async function runFile(uri) {
   state.terminal = vscode.window.createTerminal({ name: '▶ Run', pty, iconPath: new vscode.ThemeIcon('play') })
   runTerm = state
   state.terminal.show(false)
+}
+
+/**
+ * A step's Check runs their file in the app with the check's inputs typed in: shown in one "▶ Check" terminal (each
+ * check under its own heading), read-only (the app types the inputs, nothing they type goes in).
+ */
+function showCheckRun(m) {
+  const label = typeof m.label === 'string' ? m.label.slice(0, 60) : 'Check'
+  const heading = `${PINK}◆ ${label}${RESET} ${DIM}${path.basename(m.file)}${RESET}\r\n`
+  if (runTerm && runTerm.check) {
+    runTerm.id = m.runId
+    runTerm.done = false
+    runTerm.write.fire(`\r\n${heading}`)
+    runTerm.terminal.show(true)
+    return
+  }
+  if (runTerm) runTerm.terminal.dispose()
+  const write = new vscode.EventEmitter()
+  const state = { id: m.runId, file: m.file, done: false, terminal: null, write, check: true }
+  const pty = {
+    onDidWrite: write.event,
+    open: () => write.fire(heading),
+    close: () => {
+      if (runTerm === state) runTerm = null
+    },
+    handleInput: () => {}
+  }
+  state.terminal = vscode.window.createTerminal({ name: '▶ Check', pty, iconPath: new vscode.ThemeIcon('pass') })
+  runTerm = state
+  state.terminal.show(true)
 }
 
 function finishRun(state, line) {

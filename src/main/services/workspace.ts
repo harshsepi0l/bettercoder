@@ -11,6 +11,8 @@ import type { IdeHub } from './editor-link'
 import { SessionTasks } from './tasks'
 import type { RunSummary } from '../../shared/code'
 import type { SendTarget, TaskCheck, TasksUpdate } from '../../shared/tasks'
+import { cleanChecks, stepKey, type CheckResult, type RunCheck, type StepOfTask, type StepRun } from '../../shared/step-checks'
+import { gradeCheck } from '../core/step-check'
 
 /** A short project name from an idea: its first few words. */
 export function ideaName(idea: string): string {
@@ -184,7 +186,7 @@ export class WorkspaceController {
   /** The open session's tasks, as the panel sees them. */
   tasks(): TasksUpdate {
     const a = this.active
-    return a ? { sessionId: a.record.id, tasks: a.tasks.view() } : { sessionId: null, tasks: [] }
+    return a ? { sessionId: a.record.id, tasks: a.tasks.view(), steps: a.tasks.runs() } : { sessionId: null, tasks: [] }
   }
 
   /** The learner adds a task: it waits until the coach writes how to check it (the panel then asks the coach). */
@@ -203,6 +205,34 @@ export class WorkspaceController {
     const a = this.active
     if (!a) throw new Error('Open a session first.')
     return a.tasks.check(id, run)
+  }
+
+  /**
+   * Check a step card: its file runs once per check with that check's inputs typed in (`runOne`, the ▶ Run machinery,
+   * shown in their editor), and each expectation is graded by fixed rules (core/step-check.ts). The coach never runs
+   * anything and is not asked.
+   */
+  async checkStep(
+    title: string,
+    checks: readonly RunCheck[],
+    path: string,
+    of: StepOfTask | null,
+    runOne: (path: string, inputs: readonly string[], label: string) => Promise<{ run: RunSummary; timedOut: boolean }>
+  ): Promise<StepRun> {
+    const a = this.active
+    if (!a) throw new Error('Open a session first.')
+    const clean = cleanChecks(checks)
+    if (clean.length === 0) throw new Error('This step has nothing to check.')
+    const results: CheckResult[] = []
+    for (const [i, c] of clean.entries()) {
+      const { run, timedOut } = await runOne(path, c.inputs, `Check ${i + 1} of ${clean.length}`)
+      results.push(...gradeCheck(c, run, timedOut))
+      // Another session opened meanwhile: the rest belongs to nobody.
+      if (this.active !== a) throw new Error('The session changed while checking.')
+    }
+    const done: StepRun = { at: Date.now(), results, passed: results.every((r) => r.pass) }
+    a.tasks.recordStep(stepKey(title, clean), done, of)
+    return done
   }
 
   /** Copy tasks (fresh, not done) into a new or existing session of this project, then open it. */
@@ -289,7 +319,7 @@ export class WorkspaceController {
         (notice) => {
           if (this.active?.record.id !== record.id) return
           this.deps.ide?.setTaskLine(tasks.statusLine())
-          this.deps.tasksChanged?.({ sessionId: record.id, tasks: tasks.view(), ...(notice ? { notice } : {}) })
+          this.deps.tasksChanged?.({ sessionId: record.id, tasks: tasks.view(), steps: tasks.runs(), ...(notice ? { notice } : {}) })
         }
       )
       const coach = await Coach.open(
@@ -329,7 +359,7 @@ export class WorkspaceController {
       }
       this.active = { record, coach, open, tasks }
       this.deps.ide?.setSession(info.root ? { root: info.root, files: info.files } : null, tasks.statusLine(), coach.initialStep)
-      this.deps.tasksChanged?.({ sessionId: record.id, tasks: tasks.view() })
+      this.deps.tasksChanged?.({ sessionId: record.id, tasks: tasks.view(), steps: tasks.runs() })
       this.deps.emit({ type: 'session_opened', open })
       if (info.root) this.deps.opened?.(info)
       // session_opened resets the panel to idle; a run resumed on open must still show as busy.

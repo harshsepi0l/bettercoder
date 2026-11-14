@@ -69,7 +69,8 @@ const tasks: TasksApi = {
   add: (title) => ipcRenderer.invoke(TASKS_IPC.add, title),
   remove: (id) => ipcRenderer.invoke(TASKS_IPC.remove, id),
   check: (id) => ipcRenderer.invoke(TASKS_IPC.check, id),
-  send: (ids, target) => ipcRenderer.invoke(TASKS_IPC.send, ids, target)
+  send: (ids, target) => ipcRenderer.invoke(TASKS_IPC.send, ids, target),
+  checkStep: (title, checks, path, of) => ipcRenderer.invoke(TASKS_IPC.checkStep, title, checks, path, of)
 }
 
 const code: CodeApi = {

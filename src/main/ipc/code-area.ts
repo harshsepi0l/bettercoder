@@ -78,6 +78,33 @@ export class CodeArea {
     return t.hub.startRun(p.sessionId, p.root, path, spawn)
   }
 
+  /**
+   * A step's Check: the file runs as with ▶ Run, the check's inputs are typed in one line at a time, and it is stopped
+   * if it has not ended after `timeoutMs` (still waiting for input, or looping). Resolves with the finished run.
+   */
+  async runWith(path: string, inputs: readonly string[], onStart?: (run: RunSummary) => void, timeoutMs = 20_000): Promise<{ run: RunSummary; timedOut: boolean }> {
+    const started = await this.run(path, 100, 30)
+    const h = this.hubFor()
+    if (!h) throw new SandboxError('The terminal is not available here.')
+    const ended = new Promise<RunSummary>((resolve) => {
+      const off = h.hub.onRunEnd((_s, run) => {
+        if (run.id !== started.id) return
+        off()
+        resolve(run)
+      })
+    })
+    onStart?.(started)
+    for (const line of inputs) h.hub.input(h.sessionId, started.id, `${line}\r`)
+    let timedOut = false
+    const timer = setTimeout(() => {
+      timedOut = true
+      h.hub.stop(h.sessionId, started.id)
+    }, timeoutMs)
+    const run = await ended
+    clearTimeout(timer)
+    return { run, timedOut }
+  }
+
   private hubFor(): { hub: TerminalHub; sessionId: string } | null {
     const p = this.deps.project()
     const t = this.deps.terminals()

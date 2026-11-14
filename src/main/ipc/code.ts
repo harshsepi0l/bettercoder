@@ -1,4 +1,5 @@
 import type { IdeCommand, ToIde } from '../../shared/ide'
+import type { RunSummary } from '../../shared/code'
 import { resolveInside } from '../adapters/fs-readonly'
 import { realTerminals, terminalEnv, terminalProblem } from '../adapters/pty'
 import { planForFile } from '../adapters/toolchain'
@@ -17,7 +18,12 @@ export function registerRuns(
   { workspace, ide }: IpcContext,
   /** The editor link: ▶ Run pressed there comes in here, and its terminal and problems go back. */
   link: { send(m: ToIde): void; onCommand(handler: (m: IdeCommand) => void): void }
-): { sessionClosed(sessionId: string): void; shutdown(): void } {
+): {
+  sessionClosed(sessionId: string): void
+  shutdown(): void
+  /** A step's Check: one run with these inputs typed in, shown in the editor's ▶ Check terminal. */
+  runCheck(path: string, inputs: readonly string[], label: string): Promise<{ run: RunSummary; timedOut: boolean }>
+} {
   const project = () => {
     const p = workspace.activeProject()
     const sessionId = workspace.activeSessionId()
@@ -57,6 +63,9 @@ export function registerRuns(
     },
     shutdown() {
       if ('hub' in terminals) terminals.hub.closeAll()
+    },
+    runCheck(path, inputs, label) {
+      return area.runWith(path, inputs, (run) => editorRuns.followCheck(run, label))
     }
   }
 }
