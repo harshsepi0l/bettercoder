@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { LearnerProfile } from '../../../../shared/profile'
-import { CodeViewPicker, SkillsView, StyleEditor } from '@/features/profile/profile-editor'
+import { CodeViewPicker, SkillsView, StyleEditor, ThemePicker } from '@/features/profile/profile-editor'
 import { EditorImport, useEditorSources } from '@/features/profile/editor-import'
 import { CheckCircle2, ExternalLink, KeyRound, Loader2, LogIn, Search, X } from 'lucide-react'
 import type { ProviderId, ProviderStatus } from '../../../../shared/harness'
@@ -41,7 +41,7 @@ export function SettingsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle className="text-heading">Settings</DialogTitle>
+          <DialogTitle>Settings</DialogTitle>
           <DialogDescription>
             How your coach talks to you, and the model it runs on. Keys and sign-ins are stored in your OS keychain and
             never leave this app's main process.
@@ -100,17 +100,21 @@ function YouSection({ state, onRedoSetup }: { state: SettingsState; onRedoSetup:
   return (
     <section className="flex flex-col gap-4" aria-labelledby="you-heading">
       <div className="flex flex-col gap-1">
-        <h3 id="you-heading" className="text-sm font-medium text-heading">
+        <h3 id="you-heading" className="font-serif text-[19px] font-normal text-heading">
           You
         </h3>
         <p className="text-[12px] text-muted-foreground">Sets how much your coach explains, and how it talks to you.</p>
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-[12.5px] font-medium text-heading">Real code in step cards</span>
+        <span className="bc-label">Look</span>
+        <ThemePicker value={saved.theme} onChange={async (theme) => state.apply(await window.harness.setProfile({ ...saved, theme }))} />
+      </div>
+      <div className="flex flex-col gap-2">
+        <span className="bc-label">Real code in step cards</span>
         <CodeViewPicker value={saved.codeView} onChange={async (codeView) => state.apply(await window.harness.setProfile({ ...saved, codeView }))} />
       </div>
       <div className="flex flex-col gap-2">
-        <span className="text-[12.5px] font-medium text-heading">Coach thinks</span>
+        <span className="bc-label">Coach thinks</span>
         <SkillsView
           skills={saved.skills}
           onSet={async (s, level) => state.apply(await window.harness.setSkill(s.language, s.topic, level))}

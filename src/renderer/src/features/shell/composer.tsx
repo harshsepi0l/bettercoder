@@ -126,7 +126,7 @@ export function Composer({
             </Button>
           )}
         </form>
-        <div className="flex items-center justify-between gap-2 font-mono text-[10px] tracking-[0.04em] text-muted-foreground">
+        <div className="bc-label flex items-center justify-between gap-2 text-[10px] tracking-[0.05em]">
           {!confirming && (
             <span className="flex items-center gap-1.5 whitespace-nowrap" title="The coach never writes code and only reads your files">
               <ShieldCheck className="size-3 text-brand-text" aria-hidden="true" />

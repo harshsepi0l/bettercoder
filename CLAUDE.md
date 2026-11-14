@@ -40,10 +40,11 @@ Before saying something is done: `npm test` and `npm run typecheck` must both pa
 
 ## Stack
 
-Electron 45 (Node 24, `node:sqlite`), electron-vite, Vite, React 19, TypeScript 7 (`tsgo`; the classic compiler API is unavailable, so `ts5` = `npm:typescript@5.9` is used only for parsing in the Map), Tailwind v4, shadcn/ui (Radix), lucide, Geist fonts, React Flow + dagre (Map), Mermaid (diagrams), Excalidraw (whiteboard).
+Electron 45 (Node 24, `node:sqlite`), electron-vite, Vite, React 19, TypeScript 7 (`tsgo`; the classic compiler API is unavailable, so `ts5` = `npm:typescript@5.9` is used only for parsing in the Map), Tailwind v4, shadcn/ui (Radix), lucide, Geist and Source Serif 4 fonts (OFL, bundled via fontsource), React Flow + dagre (Map), Mermaid (diagrams), Excalidraw (whiteboard).
 
 - `package.json` is `"type": "module"`. The preload builds to CJS `index.cjs` (sandboxed). Main uses `import.meta.dirname`.
-- Theme: Mantine-style dark greys with a maroon primary (`#8B1E2D`, lines `#C0394B`, text tint `#F1A2AB`). Use the tokens (`bg-chrome`, `border-divider`, `text-heading`, `text-brand-text`, `border-brand-line`), not hex values.
+- Look ("Instrument", chosen 2026-11-14): one ground colour with **hairline borders, no filled panels**; tiny uppercase mono labels (`.bc-label`); serif titles (`font-serif`, Source Serif 4, used for step titles); red as the only accent. Two themes with the same look: **dark** = near-black with red (`#0F0F10`, maroon `#8B1E2D` buttons, lines `#C0394B`, small red text `#EC7480`), **light** = the same in daylight (off-white, white cards, maroon accent). Use the tokens (`bg-chrome`, `border-divider`, `text-heading`, `text-brand-text`, `border-brand-line`), not hex values: both themes define every token in `styles/globals.css`.
+- Theme: the learner picks Dark, Light or "Match my computer" in Settings › You (`profile.theme`, with previews; never in a session). `features/settings/theme.ts` puts it on `<html data-theme>` and tells the main process (`IPC.setTheme`): the window's colours and VS Code's theme follow (`BetterCoder Dark` / `BetterCoder Light` in `ide/vscode/themes`, `withEditorTheme`: only while they are on one of ours). The whiteboard (`BOARD_THEMES`) and Mermaid diagrams read the theme too.
 
 ## Layout
 
@@ -169,4 +170,4 @@ tests/                    *.test.ts plus fixtures/ (read-only sample projects)
 
 - Visualize mode is the whiteboard: every board the coach drew in the session (pan and zoom), filling the pane; with none, "Ask the coach to draw it" (the `visualize` intent). Chat cards show the same board smaller (its canvas not interactive) with Expand, which opens it in Visualize mode (`BoardOpenContext`).
 - The Visualize button, and any message sent from Visualize mode (`isDrawing`), restrict the coach to reading, `ask_question` and `draw_board` (`beforeTool`); a reply in words is nudged once to draw (`VISUALIZE_NUDGE`).
-- Excalidraw runs in its light theme on the app's grey (its dark theme inverts canvas colours); its menus are hidden (`.bc-board` in globals.css). The camera frames the board's last step with Excalidraw's `scrollToContent` (never past 1.2×), put back after every step, so it never moves while playing; new things fade in. The coach is told to use the real inputs and values from their last run.
+- Excalidraw runs in its light theme on the app's ground colour, in the app theme's colours (`BOARD_THEMES`; its own dark theme inverts canvas colours); its menus are hidden (`.bc-board` in globals.css). The camera frames the board's last step with Excalidraw's `scrollToContent` (never past 1.2×), put back after every step, so it never moves while playing; new things fade in. The coach is told to use the real inputs and values from their last run.

@@ -13,7 +13,7 @@ export const MODES: Array<{ id: CoachMode; label: string; icon: LucideIcon }> = 
 
 export function ModeBar({ mode, onChange, locked }: { mode: CoachMode; onChange: (m: CoachMode) => void; locked: CoachMode[] }) {
   return (
-    <div role="tablist" aria-label="Coach mode" className="@container flex shrink-0 gap-0.5 border-b border-divider bg-chrome px-1.5 py-1.5">
+    <div role="tablist" aria-label="Coach mode" className="@container flex h-11 shrink-0 items-stretch justify-between gap-1 overflow-x-auto border-b border-divider bg-chrome px-3">
       {MODES.map(({ id, label, icon: Icon }) => {
         const off = locked.includes(id)
         return (
@@ -26,8 +26,8 @@ export function ModeBar({ mode, onChange, locked }: { mode: CoachMode; onChange:
             title={off ? 'Link your project folder to use this' : undefined}
             onClick={() => onChange(id)}
             className={cn(
-              'flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-1.5 py-1 text-[12.5px] outline-none focus-visible:ring-2 focus-visible:ring-brand-line disabled:opacity-40',
-              mode === id ? 'bg-accent text-heading shadow-[inset_0_-2px_0_var(--brand-line)]' : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              'bc-label flex shrink-0 items-center justify-center gap-1.5 px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-brand-line disabled:opacity-40',
+              mode === id ? 'text-heading shadow-[inset_0_-2px_0_var(--brand-line)]' : 'hover:text-foreground'
             )}
           >
             {/* A narrow pane keeps the words and drops the icons, so all five modes always fit. */}

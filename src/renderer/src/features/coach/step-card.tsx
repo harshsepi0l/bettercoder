@@ -12,8 +12,8 @@ import { StepChecks } from './step-checks'
 
 type StepCardData = Extract<Card, { kind: 'step' }>
 
-const SHELL = 'flex flex-col gap-3.5 rounded-lg border bg-card p-3.5'
-const LABEL = 'flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground'
+const SHELL = 'flex flex-col gap-3.5 rounded-xl border bg-card p-4'
+const LABEL = 'bc-label flex items-center gap-1.5'
 const linked = (l: StepLine) => !!(l.method && l.docUrl)
 const depthOf = (text: string) => Math.min(6, Math.floor((text.length - text.trimStart().length) / 2))
 
@@ -42,7 +42,7 @@ export function StepCard({
     <div className={cn(SHELL, active && 'border-brand-line/60')}>
       <div className={LABEL}>
         <Footprints className="size-3 text-brand-text" aria-hidden="true" />
-        <span className="min-w-0 flex-1 truncate">{card.title.toUpperCase()}</span>
+        <span className="min-w-0 flex-1 truncate">{card.of ? `Step ${card.of.step}` : 'Step'}</span>
         {card.anchor && (
           <button
             type="button"
@@ -55,6 +55,8 @@ export function StepCard({
           </button>
         )}
       </div>
+
+      <h3 className="m-0 font-serif text-[23px] leading-tight font-normal text-heading">{card.title}</h3>
 
       {card.idea && <Idea idea={card.idea} showExample={!hasLinks} />}
 

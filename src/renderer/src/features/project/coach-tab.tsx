@@ -105,7 +105,7 @@ function ProjectLine({ project }: { project: ProjectInfo }) {
 function ProjectCard({ project }: { project: ProjectInfo }) {
   return (
     <section className="flex flex-col gap-2 rounded-lg border bg-muted p-3">
-      <div className="flex items-center gap-2 font-mono text-[10px] tracking-[0.06em] text-muted-foreground">
+      <div className="flex items-center gap-2 bc-label">
         <Search className="size-3 text-brand-text" aria-hidden="true" />
         DETECTED · READ-ONLY
       </div>

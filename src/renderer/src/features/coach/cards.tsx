@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { BookOpen, Clapperboard, ExternalLink, PenLine, FileCode2, Lightbulb, ListOrdered, ScrollText, Workflow } from 'lucide-react'
 import { BoardPlayer } from '@/features/visualize/board-player'
 import { useBoardOpen } from '@/features/visualize/board-open'
+import { themeColor, useShownTheme } from '@/features/settings/theme'
 import { QuestionBody } from './question-body'
 import { StepCard } from './step-card'
 import { DocExampleView } from '@/features/sources/doc-example'
@@ -9,8 +10,8 @@ import type { Card } from '../../../../shared/cards'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-const SHELL = 'flex flex-col gap-3 rounded-lg border bg-card p-3.5'
-const LABEL = 'flex items-center gap-1.5 font-mono text-[10px] tracking-[0.06em] text-muted-foreground'
+const SHELL = 'flex flex-col gap-3 rounded-xl border bg-card p-4'
+const LABEL = 'bc-label flex items-center gap-1.5'
 
 export function CardView({
   id,
@@ -103,8 +104,11 @@ function QuestionCard({
 }
 
 let mermaidReady: Promise<typeof import('mermaid')['default']> | null = null
+/** Mermaid, set up with the theme's colours as they are now (so a diagram drawn after a theme change matches). */
 function loadMermaid() {
-  mermaidReady ??= import('mermaid').then(({ default: mermaid }) => {
+  mermaidReady ??= import('mermaid').then(({ default: mermaid }) => mermaid)
+  return mermaidReady.then((mermaid) => {
+    const c = themeColor
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: 'strict',
@@ -112,38 +116,37 @@ function loadMermaid() {
       fontFamily: 'Geist Variable, ui-sans-serif, system-ui, sans-serif',
       flowchart: { htmlLabels: false, curve: 'basis' },
       themeVariables: {
-        darkMode: true,
-        background: '#2e2e2e',
-        primaryColor: '#3a1a1f',
-        primaryBorderColor: '#c0394b',
-        primaryTextColor: '#ffffff',
-        secondaryColor: '#2a2a2a',
-        secondaryBorderColor: '#5c5c5c',
-        secondaryTextColor: '#c9c9c9',
-        tertiaryColor: '#242424',
-        tertiaryBorderColor: '#424242',
-        tertiaryTextColor: '#c9c9c9',
-        lineColor: '#a8a8a8',
-        textColor: '#c9c9c9',
-        mainBkg: '#3a1a1f',
-        nodeBorder: '#c0394b',
-        clusterBkg: '#2a2a2a',
-        clusterBorder: '#424242',
-        edgeLabelBackground: '#2e2e2e',
-        actorBkg: '#3a1a1f',
-        actorBorder: '#c0394b',
-        actorTextColor: '#ffffff',
-        signalColor: '#c9c9c9',
-        signalTextColor: '#c9c9c9',
-        noteBkgColor: '#2a2a2a',
-        noteTextColor: '#c9c9c9',
-        noteBorderColor: '#5c5c5c',
+        darkMode: document.documentElement.dataset.theme !== 'light',
+        background: c('card'),
+        primaryColor: c('brand-tint'),
+        primaryBorderColor: c('brand-line'),
+        primaryTextColor: c('heading'),
+        secondaryColor: c('muted'),
+        secondaryBorderColor: c('border'),
+        secondaryTextColor: c('foreground'),
+        tertiaryColor: c('background'),
+        tertiaryBorderColor: c('border'),
+        tertiaryTextColor: c('foreground'),
+        lineColor: c('muted-foreground'),
+        textColor: c('foreground'),
+        mainBkg: c('brand-tint'),
+        nodeBorder: c('brand-line'),
+        clusterBkg: c('muted'),
+        clusterBorder: c('border'),
+        edgeLabelBackground: c('card'),
+        actorBkg: c('brand-tint'),
+        actorBorder: c('brand-line'),
+        actorTextColor: c('heading'),
+        signalColor: c('foreground'),
+        signalTextColor: c('foreground'),
+        noteBkgColor: c('muted'),
+        noteTextColor: c('foreground'),
+        noteBorderColor: c('border'),
         fontSize: '13px'
       }
     })
     return mermaid
   })
-  return mermaidReady
 }
 
 let diagramCounter = 0
@@ -151,6 +154,7 @@ let diagramCounter = 0
 function DiagramCard({ card }: { card: Extract<Card, { kind: 'diagram' }> }) {
   const [svg, setSvg] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
+  const theme = useShownTheme()
   useEffect(() => {
     let cancelled = false
     void loadMermaid()
@@ -160,7 +164,7 @@ function DiagramCard({ card }: { card: Extract<Card, { kind: 'diagram' }> }) {
     return () => {
       cancelled = true
     }
-  }, [card.mermaid])
+  }, [card.mermaid, theme])
 
   return (
     <figure className={cn(SHELL, 'm-0')}>

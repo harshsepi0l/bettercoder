@@ -7,17 +7,12 @@ import type { Drawn } from '../../../../shared/board'
 
 const EXCALIFONT = 5
 
-/** Excalidraw takes raw colours, so the theme tokens are repeated here (globals.css). */
-export const BOARD_COLORS = {
-  background: '#242424',
-  stroke: '#8a8a8a',
-  fill: '#2e2e2e',
-  text: '#ffffff',
-  name: '#a8a8a8',
-  litStroke: '#c0394b',
-  litFill: '#3a1a1f',
-  litText: '#f1a2ab'
+/** Excalidraw takes raw colours, so the theme's are repeated here (globals.css): one set per app theme. */
+export const BOARD_THEMES = {
+  dark: { background: '#0f0f10', stroke: '#77777a', fill: '#171718', text: '#f4f2ed', name: '#8f8f8a', litStroke: '#c0394b', litFill: '#24141a', litText: '#ec7480' },
+  light: { background: '#ffffff', stroke: '#8a8a8f', fill: '#f6f6f4', text: '#1c1c1e', name: '#66666b', litStroke: '#8b1e2d', litFill: '#fbf1f2', litText: '#8b1e2d' }
 } as const
+export type BoardTheme = keyof typeof BOARD_THEMES
 
 const FONT = { name: 16, note: 18, index: 13, value: 18 } as const
 
@@ -49,7 +44,8 @@ export function boardBounds(drawn: readonly Drawn[]): { x: number; y: number; w:
  * Excalidraw skeletons for a board step. `fade` (0 to 1) is how far the things added in this step have appeared.
  * Plain objects: the caller passes them to Excalidraw's convertToExcalidrawElements.
  */
-export function boardSkeletons(drawn: readonly Drawn[], fade = 1): Array<Record<string, unknown>> {
+export function boardSkeletons(drawn: readonly Drawn[], fade = 1, theme: BoardTheme = 'dark'): Array<Record<string, unknown>> {
+  const BOARD_COLORS = BOARD_THEMES[theme]
   const opacity = (fresh: boolean) => (fresh ? Math.round(100 * fade) : 100)
   // Arrows start at the middle of one shape and end at the middle of the other; Excalidraw moves the ends to the edges.
   const middle = new Map<string, [number, number]>()

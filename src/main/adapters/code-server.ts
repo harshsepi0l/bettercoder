@@ -32,6 +32,22 @@ export const SESSION_COOKIE = 'code-server-session'
  * settings win): our theme and a quiet start. The rules that always win (no AI, nothing typed in for them, the app's
  * own layout) are FORCED_SETTINGS, put back on every start.
  */
+/** The app's own editor themes (ide/vscode/themes), one per app theme. */
+export const EDITOR_THEMES = { dark: 'BetterCoder Dark', light: 'BetterCoder Light' } as const
+
+/**
+ * The learner's settings with the editor theme matching the app's, or null when nothing changes. Only while they are
+ * on one of our two themes (or none): a theme they picked or brought from their own VS Code is theirs to keep.
+ */
+export function withEditorTheme(text: string | null, theme: 'dark' | 'light'): string | null {
+  const parsed = text === null ? null : parseJsonc(text)
+  const current = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : {}
+  const now = current['workbench.colorTheme']
+  const ours = now === undefined || now === EDITOR_THEMES.dark || now === EDITOR_THEMES.light
+  if (!ours || now === EDITOR_THEMES[theme]) return null
+  return JSON.stringify({ ...current, 'workbench.colorTheme': EDITOR_THEMES[theme] }, null, 2) + '\n'
+}
+
 export const STARTING_SETTINGS: Record<string, unknown> = {
   'workbench.colorTheme': 'BetterCoder Dark',
   'workbench.startupEditor': 'none'
@@ -63,6 +79,8 @@ export interface CodeServerOptions {
 }
 
 export class CodeServer {
+  /** The app's theme, for the editor's (set before or after it starts). */
+  private theme: 'dark' | 'light' = 'dark'
   private child: ChildProcess | null = null
   private starting: Promise<string> | null = null
   /** The secret of the running server: the only session cookie it accepts. */
@@ -152,6 +170,17 @@ export class CodeServer {
     return base
   }
 
+  /** The app's theme changed: the editor follows (VS Code picks a changed settings file up by itself). */
+  async setTheme(theme: 'dark' | 'light'): Promise<void> {
+    this.theme = theme
+    const settings = join(this.userDataDir, 'User', 'settings.json')
+    const next = withEditorTheme(await readFile(settings, 'utf8').catch(() => null), theme)
+    if (next !== null) {
+      await mkdir(join(this.userDataDir, 'User'), { recursive: true })
+      await writeFile(settings, next)
+    }
+  }
+
   /** Its folders, the starting settings it is missing, and the BetterCoder extension registered in. */
   private async prepare(): Promise<void> {
     const userDir = join(this.userDataDir, 'User')
@@ -163,6 +192,8 @@ export class CodeServer {
     const settings = join(userDir, 'settings.json')
     const next = withStartingSettings(await readFile(settings, 'utf8').catch(() => null))
     if (next !== null) await writeFile(settings, next)
+    const themed = withEditorTheme(await readFile(settings, 'utf8').catch(() => null), this.theme)
+    if (themed !== null) await writeFile(settings, themed)
     await registerExtension(this.extensionsDir, this.opts.extension)
     const removed = await removeAiExtensions(this.extensionsDir)
     if (removed.length) this.opts.log?.(`removed AI extensions: ${removed.join(', ')}`)

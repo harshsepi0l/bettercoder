@@ -32,7 +32,7 @@ export function TasksTab({ busy, onSend, onAsk }: { busy: boolean; onSend: Send;
     <div className="min-h-0 flex-1 overflow-y-auto">
       <div className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-4">
         <div className="flex items-center gap-2">
-          <h2 className="flex-1 text-[15px] font-semibold text-heading">Tasks</h2>
+          <h2 className="flex-1 font-serif text-[21px] font-normal text-heading">Tasks</h2>
           {tasks.length > 0 && (
             <>
               <span className="font-mono text-[11px] text-muted-foreground">

@@ -36,11 +36,11 @@ function createWindow(): void {
     minHeight: 480,
     show: false,
     title: 'BetterCoder',
-    backgroundColor: '#1f1f1f',
+    backgroundColor: '#0f0f10',
     titleBarStyle: 'hidden',
     ...(isMac
       ? { trafficLightPosition: { x: 12, y: 14 } }
-      : { titleBarOverlay: { color: '#1f1f1f', symbolColor: '#c9c9c9', height: 40 } }),
+      : { titleBarOverlay: { color: '#0f0f10', symbolColor: '#d6d4cf', height: 40 } }),
     webPreferences: {
       preload: join(import.meta.dirname, '../preload/index.cjs'),
       sandbox: true,

@@ -1,5 +1,5 @@
 import { Check, X } from 'lucide-react'
-import { NOTES_MAX, SKILL_LEVELS, STYLES, type CodeView, type LearnerProfile, type Skill, type SkillLevel } from '../../../../shared/profile'
+import { NOTES_MAX, SKILL_LEVELS, STYLES, THEMES, type CodeView, type LearnerProfile, type Skill, type SkillLevel, type Theme } from '../../../../shared/profile'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
@@ -22,7 +22,7 @@ export function SkillsView({ skills, onSet, onForget }: { skills: Skill[]; onSet
     <div className="flex flex-col gap-3">
       {[...byLanguage].map(([language, list]) => (
         <div key={language} className="flex flex-col gap-1.5">
-          <span className="font-mono text-[10px] tracking-[0.06em] text-muted-foreground">{language === 'general' ? 'GENERAL' : language.toUpperCase()}</span>
+          <span className="bc-label">{language === 'general' ? 'GENERAL' : language.toUpperCase()}</span>
           <ul className="flex flex-col divide-y rounded-lg border">
             {list.map((s) => (
               <li key={s.topic} className="flex items-center gap-3 px-3 py-2">
@@ -220,6 +220,51 @@ export function CodeViewPicker({ value, onChange }: { value: CodeView | undefine
               </span>
             </div>
             {v.id === 'highlight' ? <HighlightPreview /> : <StepperPreview />}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+const THEME_PREVIEW: Record<Theme, { ground: string; line: string; text: string; accent: string }[]> = {
+  system: [
+    { ground: '#0f0f10', line: '#2a2a2a', text: '#f4f2ed', accent: '#c0394b' },
+    { ground: '#fbfbfa', line: '#d9d9d6', text: '#1c1c1e', accent: '#8b1e2d' }
+  ],
+  dark: [{ ground: '#0f0f10', line: '#2a2a2a', text: '#f4f2ed', accent: '#c0394b' }],
+  light: [{ ground: '#fbfbfa', line: '#d9d9d6', text: '#1c1c1e', accent: '#8b1e2d' }]
+}
+
+/**
+ * The app's look: dark (black with red), light (the same look in daylight), or the computer's setting, each with a
+ * small preview. Settings › You only; never inside a session.
+ */
+export function ThemePicker({ value, onChange }: { value: Theme | undefined; onChange: (theme: Theme) => void }) {
+  const picked = value ?? 'system'
+  return (
+    <div role="radiogroup" aria-label="The app's look" className="grid w-full grid-cols-3 gap-3">
+      {THEMES.map((t) => {
+        const on = t.id === picked
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => onChange(t.id)}
+            className={cn('flex flex-col gap-2 rounded-xl border p-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring', on ? 'border-brand-line' : 'hover:border-muted-foreground/50')}
+          >
+            <span className="flex h-14 overflow-hidden rounded-md border" aria-hidden="true">
+              {THEME_PREVIEW[t.id].map((p, i) => (
+                <span key={i} className="flex flex-1 flex-col justify-between p-2" style={{ background: p.ground }}>
+                  <span className="h-1.5 w-8 rounded-full" style={{ background: p.text }} />
+                  <span className="h-px w-full" style={{ background: p.line }} />
+                  <span className="h-2.5 w-6 rounded-sm" style={{ background: p.accent }} />
+                </span>
+              ))}
+            </span>
+            <span className={cn('text-[12.5px]', on ? 'font-medium text-heading' : 'text-foreground')}>{t.label}</span>
           </button>
         )
       })}
